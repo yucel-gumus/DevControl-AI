@@ -3,144 +3,122 @@
 :root {
   /* ==========================================================================
      DEVCONTROL AI — 3 RENK MERKEZİ PALET (60 - 30 - 10 KURALI)
-     İleride renk değiştirmek için sadece aşağıdaki 3 hex kodunu güncelleyin:
+     Tam olarak istenen 3 renk: #f6f3f4, #f9efec, #fff4f0
      ========================================================================== */
-  --c1: #B5DEF6; /* %30 SECONDARY: Paneller, Kartlar, Kenarlıklar, Yapısal Alanlar */
-  --c2: #EEF5DB; /* %60 DOMINANT: Ana Tuval, Sayfa Tabanı, Geniş Yüzeyler */
-  --c3: #E2D0FB; /* %10 ACCENT: Hero Butonlar, Aktif Sekmeler, Vurgu Rozetleri */
 
-  /* RGB Kanalları */
-  --c1-rgb: 181, 222, 246;
-  --c2-rgb: 238, 245, 219;
-  --c3-rgb: 226, 208, 251;
+  /* 60% DOMINANT: Ana sayfa tabanı, geniş tuval */
+  --c60: #f6f3f4;
+  --c60-rgb: 246, 243, 244;
 
-  /* 60 - 30 - 10 Semantik Rol Eşlemeleri */
-  --dominant-bg: var(--c2);
-  --secondary-surface: var(--c1);
-  --accent-cta: var(--c3);
+  /* 30% SECONDARY: Kartlar, paneller, kenarlıklar, yan menü, üst çubuk */
+  --c30: #f9efec;
+  --c30-rgb: 249, 239, 236;
 
-  /* Yüksek Kontrastlı Okunabilir Mürekkep (Typography Ink) */
-  --ink-primary: #122129;
-  --ink-secondary: #2d4452;
-  --ink-muted: #516d7d;
+  /* 10% ACCENT: Butonlar, aktif sekmeler, vurgu hapları, etkileşimli elemanlar */
+  --c10: #fff4f0;
+  --c10-rgb: 255, 244, 240;
 
-  /* Şeffaflık Katmanları (Strictly derived from c1, c2, c3) */
-  --c1-15: rgba(var(--c1-rgb), 0.15);
-  --c1-25: rgba(var(--c1-rgb), 0.25);
-  --c1-50: rgba(var(--c1-rgb), 0.50);
-  --c1-80: rgba(var(--c1-rgb), 0.80);
+  /* Semantik Rol Eşlemeleri */
+  --bg-canvas: var(--c60);
+  --surface-card: var(--c30);
+  --accent-cta: var(--c10);
 
-  --c2-40: rgba(var(--c2-rgb), 0.40);
-  --c2-80: rgba(var(--c2-rgb), 0.80);
+  --dominant-bg: var(--c60);
+  --secondary-surface: var(--c30);
+  --accent-action: var(--c10);
 
-  --c3-20: rgba(var(--c3-rgb), 0.20);
-  --c3-40: rgba(var(--c3-rgb), 0.40);
-  --c3-80: rgba(var(--c3-rgb), 0.80);
+  /* Kenarlıklar (Renk paletiyle uyumlu, sakin ve zarif) */
+  --border-subtle: #e8ded9;
+  --border-strong: #d9cbc5;
+  --border-focus: #cbb9b2;
 
-  /* Kenarlıklar */
-  --border-subtle: rgba(var(--c1-rgb), 0.45);
-  --border-accent: rgba(var(--c3-rgb), 0.80);
+  /* Yüksek Kontrastlı Okunabilir Tipografi (WCAG AAA uyumlu derin füme mürekkep) */
+  --ink-primary: #241c1d;
+  --ink-secondary: #5c5254;
+  --ink-muted: #8c8082;
 }
 
 @theme {
-  --color-dominant: var(--dominant-bg);
-  --color-secondary: var(--secondary-surface);
-  --color-accent: var(--accent-cta);
-  --color-c1: var(--c1);
-  --color-c2: var(--c2);
-  --color-c3: var(--c3);
+  --color-c60: var(--c60);
+  --color-c30: var(--c30);
+  --color-c10: var(--c10);
+  --color-dominant: var(--c60);
+  --color-secondary: var(--c30);
+  --color-accent: var(--c10);
+  --color-ink-primary: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
 }
 
-/* ==========================================================================
-   UI / UX PRO MAX ORTAK TASARIM YARDIMCILARI (3 RENKLE SINIRLI)
-   ========================================================================== */
-
 body {
-  background-color: var(--dominant-bg);
+  background-color: var(--c60);
   color: var(--ink-primary);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
   padding: 0;
   overflow: hidden;
+  letter-spacing: -0.01em;
 }
 
-/* 60% Zemin Alanı */
-.bg-canvas-60 {
-  background-color: var(--c2);
-}
-
-/* 30% Yapısal Kart & Panel Yüzeyi */
-.surface-card-30 {
-  background-color: rgba(var(--c1-rgb), 0.35);
+/* 30% Kart ve Yüzeyler */
+.surface-card {
+  background-color: var(--c30);
   border: 1px solid var(--border-subtle);
-  backdrop-filter: blur(12px);
+  border-radius: 0.75rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.surface-card-hover:hover {
-  background-color: rgba(var(--c1-rgb), 0.55);
-  border-color: var(--c1);
+.surface-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(36, 28, 29, 0.04);
 }
 
-/* 10% Vurgu Butonu & Rozeti */
-.btn-accent-10 {
-  background-color: var(--c3);
+/* 10% Vurgu Butonları */
+.btn-accent {
+  background-color: var(--c10);
   color: var(--ink-primary);
   font-weight: 600;
-  border: 1px solid rgba(var(--c3-rgb), 0.9);
-  transition: all 0.2s ease;
-}
-
-.btn-accent-10:hover {
-  background-color: rgba(var(--c3-rgb), 0.85);
-  box-shadow: 0 4px 14px rgba(var(--c3-rgb), 0.4);
-}
-
-.btn-secondary-30 {
-  background-color: var(--c1);
-  color: var(--ink-primary);
-  font-weight: 500;
-  border: 1px solid rgba(var(--c1-rgb), 0.9);
-  transition: all 0.2s ease;
-}
-
-.btn-secondary-30:hover {
-  background-color: rgba(var(--c1-rgb), 0.75);
-}
-
-/* Rozetler (Badges) */
-.badge-accent {
-  background-color: rgba(var(--c3-rgb), 0.35);
-  color: var(--ink-primary);
-  border: 1px solid var(--c3);
-}
-
-.badge-secondary {
-  background-color: rgba(var(--c1-rgb), 0.35);
-  color: var(--ink-primary);
-  border: 1px solid var(--c1);
-}
-
-.badge-dominant {
-  background-color: rgba(var(--c2-rgb), 0.7);
-  color: var(--ink-primary);
   border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(36, 28, 29, 0.04);
 }
 
-/* Özel İnce Kaydırma Çubuğu */
+.btn-accent:hover {
+  background-color: #ffffff;
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 6px rgba(36, 28, 29, 0.06);
+}
+
+/* Sade Durum Rozetleri */
+.badge-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--c10);
+  color: var(--ink-primary);
+}
+
+/* Özel İnce ve Uyumlu Kaydırma Çubuğu */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--c2);
+  background: var(--c60);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--c1);
-  border-radius: 3px;
+  background: var(--border-subtle);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--c3);
+  background: var(--border-strong);
 }

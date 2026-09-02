@@ -35,10 +35,10 @@ export const AskAiView: React.FC<Props> = ({
 
   const sampleQuestions = [
     'Son 30 günde projelerimde ne değişti?',
-    'En büyük mühendislik riskleri nerede ve bunları nasıl çözerim?',
-    'Hangi dosyalar bakım sıcak noktasına (hotspot) dönüşüyor ve neden?',
+    'En büyük mühendislik riskleri nerede ve nasıl çözerim?',
+    'Hangi dosyalar bakım sıcak noktasına (hotspot) dönüşüyor?',
     'DevControl genel sağlık skoru dağılımımız nedir?',
-    'Bana kanıtlara dayalı mimari ve teknik başarılarımı özetle.',
+    'Kanıtlara dayalı mimari ve teknik başarılarımı özetle.',
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,70 +54,38 @@ export const AskAiView: React.FC<Props> = ({
   };
 
   return (
-    <div id="ask-ai-view" className="space-y-6 max-w-5xl mx-auto font-sans">
-      {/* Header Banner (30% Surface Card) */}
-      <div
-        className="p-6 rounded-2xl border space-y-4 shadow-sm"
-        style={{
-          backgroundColor: 'rgba(var(--c1-rgb), 0.3)',
-          borderColor: 'var(--c1)',
-        }}
-      >
+    <div id="ask-ai-view" className="space-y-6 max-w-4xl mx-auto font-sans text-[#241c1d]">
+      {/* Header Banner */}
+      <div className="p-5 rounded-xl border border-[#e8ded9] bg-[#f9efec] space-y-3.5 shadow-xs">
         <div className="flex items-center gap-3">
-          <div
-            className="p-2.5 rounded-xl border shadow-xs"
-            style={{
-              backgroundColor: 'var(--c3)',
-              borderColor: 'rgba(var(--c3-rgb), 0.9)',
-            }}
-          >
-            <Terminal className="w-5 h-5" style={{ color: 'var(--ink-primary)' }} />
+          <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d] shadow-xs">
+            <Terminal className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span
-                className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border"
-                style={{
-                  backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-                  borderColor: 'var(--c1)',
-                  color: 'var(--ink-primary)',
-                }}
-              >
-                Otonom Sorgu Planlayıcı ve Araç Motoru
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9]">
+                Otonom Sorgu Planlayıcı
               </span>
-              <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
-                style={{
-                  backgroundColor: 'var(--c3)',
-                  borderColor: 'rgba(var(--c3-rgb), 0.8)',
-                  color: 'var(--ink-primary)',
-                }}
-              >
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#fff4f0] text-[#5c5254] border border-[#e8ded9]">
                 Kanıta Dayalı
               </span>
             </div>
-            <h2 className="text-base font-extrabold mt-1" style={{ color: 'var(--ink-primary)' }}>
+            <h2 className="text-base font-bold text-[#241c1d] mt-1 tracking-tight">
               Mühendislik Verilerinize Sorun
             </h2>
           </div>
         </div>
-        <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-          Kod tabanınız, geliştirme hızınız, çekme isteği (PR) darboğazları veya mimari sıcak noktalar hakkında soru sorun.
-          Yapay zeka analisti yapılandırılmış bir yürütme planı oluşturur, Araç Kayıt Defteri'nden gerçek verileri çeker ve doğrulanabilir yanıtlar sunar.
+        <p className="text-xs text-[#5c5254] leading-relaxed">
+          Kod tabanınız, commit dalgalanmaları veya PR darboğazları hakkında soru sorun. Yapay zeka analisti telemetri verilerini tarar ve kanıtlanabilir yanıtlar üretir.
         </p>
 
         {/* Quick Sample Prompts */}
-        <div className="pt-1 flex flex-wrap gap-2">
+        <div className="pt-1 flex flex-wrap gap-1.5">
           {sampleQuestions.map((q, idx) => (
             <button
               key={idx}
               onClick={() => setInputQuery(q)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all hover:scale-101 cursor-pointer shadow-xs"
-              style={{
-                backgroundColor: 'rgba(var(--c2-rgb), 0.85)',
-                borderColor: 'var(--c1)',
-                color: 'var(--ink-primary)',
-              }}
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-md border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-colors cursor-pointer shadow-xs"
             >
               {q}
             </button>
@@ -126,34 +94,37 @@ export const AskAiView: React.FC<Props> = ({
       </div>
 
       {/* Chat Messages Container */}
-      <div className="space-y-4 min-h-[250px]">
+      <div className="space-y-4 min-h-[260px]">
+        {messages.length === 0 && (
+          <div className="p-8 rounded-xl border border-[#e8ded9] bg-[#f9efec] text-center text-xs text-[#8c8082]">
+            Henüz soru sorulmadı. Yukarıdaki önerilen sorulardan birine tıklayabilir veya aklınızdaki soruyu yazabilirsiniz.
+          </div>
+        )}
+
         {messages.map((msg) => {
           const isUser = msg.role === 'user' || (msg as any).sender === 'user';
           return (
             <div
               key={msg.id}
-              className={`p-5 rounded-2xl border transition-all shadow-sm space-y-3 ${
-                isUser ? 'ml-8' : 'mr-8'
+              className={`p-4 rounded-xl border border-[#e8ded9] transition-all shadow-xs space-y-2.5 ${
+                isUser
+                  ? 'ml-8 bg-[#fff4f0] text-[#241c1d]'
+                  : 'mr-8 bg-[#f9efec] text-[#241c1d]'
               }`}
-              style={{
-                backgroundColor: isUser ? 'rgba(var(--c1-rgb), 0.4)' : 'rgba(var(--c2-rgb), 0.9)',
-                borderColor: isUser ? 'rgba(var(--c1-rgb), 0.8)' : 'var(--c1)',
-              }}
             >
               {/* Message Header */}
-              <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'rgba(var(--c1-rgb), 0.4)' }}>
+              <div className="flex items-center justify-between border-b border-[#e8ded9] pb-2">
                 <div className="flex items-center gap-2">
                   <span
-                    className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full border"
-                    style={{
-                      backgroundColor: isUser ? 'var(--c1)' : 'var(--c3)',
-                      borderColor: isUser ? 'rgba(var(--c1-rgb), 0.9)' : 'rgba(var(--c3-rgb), 0.9)',
-                      color: 'var(--ink-primary)',
-                    }}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded border border-[#e8ded9] ${
+                      isUser
+                        ? 'bg-[#f6f3f4] text-[#241c1d]'
+                        : 'bg-[#fff4f0] text-[#241c1d]'
+                    }`}
                   >
                     {isUser ? 'Siz' : 'Mühendislik Analisti'}
                   </span>
-                  <span className="text-[10px]" style={{ color: 'var(--ink-muted)' }}>
+                  <span className="text-[10px] text-[#8c8082]">
                     {Number.isNaN(new Date(msg.timestamp).getTime())
                       ? msg.timestamp
                       : new Date(msg.timestamp).toLocaleTimeString('tr-TR')}
@@ -163,11 +134,10 @@ export const AskAiView: React.FC<Props> = ({
                 {!isUser && msg.trace && (
                   <button
                     onClick={() => toggleTrace(msg.id)}
-                    className="flex items-center gap-1 text-[11px] font-bold cursor-pointer hover:underline"
-                    style={{ color: 'var(--ink-primary)' }}
+                    className="flex items-center gap-1 text-[11px] font-bold text-[#5c5254] hover:text-[#241c1d] transition-colors cursor-pointer"
                   >
-                    <Cpu className="w-3.5 h-3.5" />
-                    <span>Yürütme Planı ({msg.trace.steps.length} adım)</span>
+                    <Cpu className="w-3.5 h-3.5 text-[#241c1d]" />
+                    <span>Plan ({msg.trace.steps.length} adım)</span>
                     {expandedTraces[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                   </button>
                 )}
@@ -175,33 +145,24 @@ export const AskAiView: React.FC<Props> = ({
 
               {/* Execution Trace (Collapsible) */}
               {!isUser && msg.trace && expandedTraces[msg.id] && (
-                <div
-                  className="p-3.5 rounded-xl border space-y-2 text-xs"
-                  style={{
-                    backgroundColor: 'rgba(var(--c1-rgb), 0.25)',
-                    borderColor: 'var(--c1)',
-                  }}
-                >
-                  <span className="text-[10px] font-black uppercase tracking-wider block" style={{ color: 'var(--ink-muted)' }}>
-                    Otonom Planlama Adımları:
+                <div className="p-3 rounded-lg border border-[#e8ded9] bg-[#f6f3f4] space-y-2 text-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#5c5254] block">
+                    Yürütme Adımları:
                   </span>
                   {msg.trace.steps.map((st, sIdx) => (
                     <div key={sIdx} className="space-y-0.5">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--c3)' }}></span>
+                      <div className="font-bold flex items-center gap-1.5 text-[#241c1d]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#241c1d] shrink-0" />
                         <span>{sIdx + 1}. {(st as any).action || st.step}</span>
                       </div>
-                      <p className="text-[11px] pl-3" style={{ color: 'var(--ink-secondary)' }}>{st.details}</p>
+                      <p className="text-[11px] pl-3 text-[#5c5254]">{st.details}</p>
                     </div>
                   ))}
                 </div>
               )}
 
               {/* Message Content */}
-              <div
-                className="text-xs leading-relaxed whitespace-pre-wrap font-sans"
-                style={{ color: 'var(--ink-primary)' }}
-              >
+              <div className="text-xs leading-relaxed whitespace-pre-wrap">
                 {msg.content}
               </div>
             </div>
@@ -210,16 +171,10 @@ export const AskAiView: React.FC<Props> = ({
 
         {/* Live Loading Skeleton */}
         {isLoading && (
-          <div
-            className="p-5 rounded-2xl border animate-pulse space-y-3 mr-8 shadow-sm"
-            style={{
-              backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-              borderColor: 'var(--c1)',
-            }}
-          >
+          <div className="p-4 rounded-xl border border-[#e8ded9] bg-[#f9efec] animate-pulse space-y-2 mr-8 shadow-xs">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 animate-spin" />
-              <span className="text-xs font-bold" style={{ color: 'var(--ink-primary)' }}>
+              <Sparkles className="w-4 h-4 animate-spin text-[#241c1d]" />
+              <span className="text-xs font-semibold text-[#241c1d]">
                 {(activeTrace?.steps.slice(-1)[0] as any)?.action || activeTrace?.steps.slice(-1)[0]?.details || 'Telemetri verileri taranıyor ve analiz ediliyor...'}
               </span>
             </div>
@@ -229,37 +184,21 @@ export const AskAiView: React.FC<Props> = ({
 
       {/* Query Input Box (Sticky Bottom) */}
       <form onSubmit={handleSubmit} className="sticky bottom-4">
-        <div
-          className="p-2 rounded-2xl border flex items-center gap-3 shadow-xl backdrop-blur-md"
-          style={{
-            backgroundColor: 'rgba(var(--c2-rgb), 0.95)',
-            borderColor: 'var(--c1)',
-          }}
-        >
+        <div className="p-1.5 rounded-xl border border-[#e8ded9] bg-[#f9efec]/95 backdrop-blur-md flex items-center gap-2 shadow-lg">
           <input
             type="text"
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             placeholder="Bir mühendislik sorusu yazın..."
             disabled={isLoading}
-            className="flex-1 px-4 py-2.5 text-xs rounded-xl border focus:outline-hidden font-medium"
-            style={{
-              backgroundColor: 'rgba(var(--c1-rgb), 0.25)',
-              borderColor: 'var(--c1)',
-              color: 'var(--ink-primary)',
-            }}
+            className="flex-1 px-3.5 py-2 text-xs bg-[#fff4f0] border border-[#e8ded9] rounded-lg text-[#241c1d] placeholder-[#8c8082] focus:outline-hidden focus:border-[#d9cbc5]"
           />
           <button
             type="submit"
             disabled={!inputQuery.trim() || isLoading}
-            className="px-5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 transition-all hover:scale-102 cursor-pointer shadow-sm disabled:opacity-40"
-            style={{
-              backgroundColor: 'var(--c3)',
-              borderColor: 'rgba(var(--c3-rgb), 0.9)',
-              color: 'var(--ink-primary)',
-            }}
+            className="px-4 py-2 rounded-lg text-xs font-bold bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-colors flex items-center gap-1.5 cursor-pointer border border-[#e8ded9] shadow-xs disabled:opacity-40 disabled:pointer-events-none"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-3.5 h-3.5" />
             <span>Gönder</span>
           </button>
         </div>

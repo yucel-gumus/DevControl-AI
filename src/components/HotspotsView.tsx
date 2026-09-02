@@ -59,129 +59,106 @@ export const HotspotsView: React.FC<Props> = ({
   );
 
   return (
-    <div id="hotspots-view" className="space-y-6 font-sans">
-      {/* Başlık ve Boyut Dağılımı (%30 Yüzey Kartı) */}
-      <div
-        className="p-6 rounded-2xl border flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shadow-sm"
-        style={{
-          backgroundColor: 'rgba(var(--c1-rgb), 0.3)',
-          borderColor: 'var(--c1)',
-        }}
-      >
+    <div id="hotspots-view" className="space-y-6 font-sans text-[#241c1d]">
+      {/* Başlık ve Boyut Dağılımı */}
+      <div className="p-5 rounded-xl border border-[#e8ded9] bg-[#f9efec] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <span
-              className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border"
-              style={{
-                backgroundColor: 'var(--c3)',
-                borderColor: 'rgba(var(--c3-rgb), 0.9)',
-                color: 'var(--ink-primary)',
-              }}
-            >
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9]">
               Kod Kalitesi & Risk Radarı
             </span>
           </div>
-          <h2 className="text-base font-extrabold mt-1" style={{ color: 'var(--ink-primary)' }}>
+          <h2 className="text-base font-bold text-[#241c1d] mt-1 tracking-tight">
             Sıcak Noktalar ve Mimari Risk Merkezi
           </h2>
-          <p className="text-xs mt-1 max-w-2xl leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+          <p className="text-xs mt-1 text-[#5c5254] max-w-2xl leading-relaxed">
             Kod dalgalanması yüksek olan kaynak dosyalarını, inceleme bekleyen PR darboğazlarını ve mimari riskleri tek bir merkezden yönetin.
           </p>
         </div>
 
         {/* Sağlık Boyutları Mini Özeti */}
         {healthScore && (
-          <div
-            className="flex items-center gap-3 p-3 rounded-xl border shadow-xs"
-            style={{
-              backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-              borderColor: 'var(--c1)',
-            }}
-          >
+          <div className="flex items-center gap-3 p-2.5 rounded-lg border border-[#e8ded9] bg-[#fff4f0] shadow-xs">
             <div className="text-center px-2">
-              <span className="text-[10px] block opacity-75">Kod Sağlığı</span>
-              <span className="text-xs font-black">{healthScore.hasData ? `${healthScore.dimensions.codeHealth}/100` : '--'}</span>
+              <span className="text-[10px] block text-[#5c5254]">Kod Sağlığı</span>
+              <span className="text-xs font-bold text-[#241c1d]">
+                {healthScore.hasData ? `${healthScore.dimensions.codeHealth}/100` : '--'}
+              </span>
             </div>
-            <div className="w-px h-6 bg-current opacity-20"></div>
+            <div className="w-px h-6 bg-[#e8ded9]" />
             <div className="text-center px-2">
-              <span className="text-[10px] block opacity-75">Teslimat</span>
-              <span className="text-xs font-black">{healthScore.hasData ? `${healthScore.dimensions.delivery}/100` : '--'}</span>
+              <span className="text-[10px] block text-[#5c5254]">Teslimat</span>
+              <span className="text-xs font-bold text-[#241c1d]">
+                {healthScore.hasData ? `${healthScore.dimensions.delivery}/100` : '--'}
+              </span>
             </div>
-            <div className="w-px h-6 bg-current opacity-20"></div>
+            <div className="w-px h-6 bg-[#e8ded9]" />
             <div className="text-center px-2">
-              <span className="text-[10px] block opacity-75">Dokümantasyon</span>
-              <span className="text-xs font-black">{healthScore.hasData ? `${healthScore.dimensions.documentation}/100` : '--'}</span>
+              <span className="text-[10px] block text-[#5c5254]">Dokümantasyon</span>
+              <span className="text-xs font-bold text-[#241c1d]">
+                {healthScore.hasData ? `${healthScore.dimensions.documentation}/100` : '--'}
+              </span>
             </div>
           </div>
         )}
       </div>
 
       {/* Alt Sekme & Filtre Kontrolleri */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* Görünüm Seçimi */}
-        <div
-          className="flex items-center gap-1.5 p-1 rounded-xl border shadow-xs"
-          style={{
-            backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-            borderColor: 'var(--c1)',
-          }}
-        >
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        {/* Görünüm Seçimi (Segmented Control) */}
+        <div className="flex items-center gap-1 p-1 rounded-lg border border-[#e8ded9] bg-[#f9efec]">
           <button
             onClick={() => setActiveSubTab('all')}
-            className="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer"
-            style={{
-              backgroundColor: activeSubTab === 'all' ? 'var(--c3)' : 'transparent',
-              color: 'var(--ink-primary)',
-              border: activeSubTab === 'all' ? '1px solid rgba(var(--c3-rgb), 0.9)' : '1px solid transparent',
-            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+              activeSubTab === 'all'
+                ? 'bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] shadow-xs'
+                : 'text-[#5c5254] hover:text-[#241c1d]'
+            }`}
           >
-            Tüm Bulgular ({safeHotspots.length + safeRisks.length})
+            Tümü ({safeHotspots.length + safeRisks.length})
           </button>
           <button
             onClick={() => setActiveSubTab('hotspots')}
-            className="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer"
-            style={{
-              backgroundColor: activeSubTab === 'hotspots' ? 'var(--c3)' : 'transparent',
-              color: 'var(--ink-primary)',
-              border: activeSubTab === 'hotspots' ? '1px solid rgba(var(--c3-rgb), 0.9)' : '1px solid transparent',
-            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+              activeSubTab === 'hotspots'
+                ? 'bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] shadow-xs'
+                : 'text-[#5c5254] hover:text-[#241c1d]'
+            }`}
           >
             Sıcak Noktalar ({safeHotspots.length})
           </button>
           <button
             onClick={() => setActiveSubTab('risks')}
-            className="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer"
-            style={{
-              backgroundColor: activeSubTab === 'risks' ? 'var(--c3)' : 'transparent',
-              color: 'var(--ink-primary)',
-              border: activeSubTab === 'risks' ? '1px solid rgba(var(--c3-rgb), 0.9)' : '1px solid transparent',
-            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+              activeSubTab === 'risks'
+                ? 'bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] shadow-xs'
+                : 'text-[#5c5254] hover:text-[#241c1d]'
+            }`}
           >
-            Mühendislik Riskleri ({safeRisks.length})
+            Riskler ({safeRisks.length})
           </button>
         </div>
 
         {/* Risk Seviyesi Filtresi */}
         {activeSubTab !== 'risks' && (
-          <div
-            className="flex items-center gap-1.5 p-1 rounded-xl border shadow-xs"
-            style={{
-              backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-              borderColor: 'var(--c1)',
-            }}
-          >
-            {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((level) => (
+          <div className="flex items-center gap-1 p-1 rounded-lg border border-[#e8ded9] bg-[#f9efec]">
+            {[
+              { id: 'ALL', label: 'Tümü' },
+              { id: 'CRITICAL', label: 'Kritik' },
+              { id: 'HIGH', label: 'Yüksek' },
+              { id: 'MEDIUM', label: 'Orta' },
+              { id: 'LOW', label: 'Düşük' },
+            ].map((lvl) => (
               <button
-                key={level}
-                onClick={() => setFilterRisk(level)}
-                className="px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer"
-                style={{
-                  backgroundColor: filterRisk === level ? 'var(--c3)' : 'transparent',
-                  color: 'var(--ink-primary)',
-                  border: filterRisk === level ? '1px solid rgba(var(--c3-rgb), 0.9)' : '1px solid transparent',
-                }}
+                key={lvl.id}
+                onClick={() => setFilterRisk(lvl.id)}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded transition-all cursor-pointer ${
+                  filterRisk === lvl.id
+                    ? 'bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] shadow-xs'
+                    : 'text-[#5c5254] hover:text-[#241c1d]'
+                }`}
               >
-                {level === 'ALL' ? 'TÜMÜ' : level === 'CRITICAL' ? 'KRİTİK' : level === 'HIGH' ? 'YÜKSEK' : level === 'MEDIUM' ? 'ORTA' : 'DÜŞÜK'}
+                {lvl.label}
               </button>
             ))}
           </div>
@@ -192,56 +169,38 @@ export const HotspotsView: React.FC<Props> = ({
       {(activeSubTab === 'all' || activeSubTab === 'risks') && safeRisks.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4" />
-            <h3 className="text-xs font-black uppercase tracking-wider">
+            <ShieldAlert className="w-4 h-4 text-[#241c1d]" />
+            <h3 className="text-xs font-bold text-[#241c1d]">
               Aktif Mühendislik Riskleri & Darboğazlar ({safeRisks.length})
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {safeRisks.map((risk, rIdx) => (
               <div
                 key={rIdx}
-                className="p-5 rounded-2xl border flex flex-col justify-between gap-4 shadow-sm"
-                style={{
-                  backgroundColor: 'rgba(var(--c1-rgb), 0.25)',
-                  borderColor: 'var(--c1)',
-                }}
+                className="p-4 rounded-xl border border-[#e8ded9] bg-[#f9efec] hover:bg-[#fff4f0] transition-all flex flex-col justify-between gap-3 shadow-xs"
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span
-                      className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md border"
-                      style={{
-                        backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-                        borderColor: 'var(--c1)',
-                        color: 'var(--ink-primary)',
-                      }}
-                    >
+                    <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] font-bold">
                       {risk.affectedRepository || risk.repo_name}
                     </span>
-                    <span
-                      className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border"
-                      style={{
-                        backgroundColor: 'var(--c3)',
-                        borderColor: 'rgba(var(--c3-rgb), 0.9)',
-                        color: 'var(--ink-primary)',
-                      }}
-                    >
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d]">
                       {RISK_TR_MAP[risk.severity] || risk.severity}
                     </span>
                   </div>
 
-                  <h4 className="text-xs font-extrabold" style={{ color: 'var(--ink-primary)' }}>
+                  <h4 className="text-xs font-bold text-[#241c1d]">
                     {risk.title}
                   </h4>
-                  <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+                  <p className="text-xs text-[#5c5254] leading-relaxed">
                     {risk.summary}
                   </p>
                 </div>
 
-                <div className="pt-2 border-t flex items-center justify-between gap-2" style={{ borderColor: 'rgba(var(--c1-rgb), 0.8)' }}>
-                  <span className="text-[11px] font-medium truncate" style={{ color: 'var(--ink-muted)' }}>
+                <div className="pt-2 border-t border-[#e8ded9] flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-[#5c5254] truncate">
                     {risk.recommendedAction}
                   </span>
                   <button
@@ -255,12 +214,7 @@ export const HotspotsView: React.FC<Props> = ({
                         recommendedAction: risk.recommendedAction,
                       })
                     }
-                    className="px-2.5 py-1 text-xs font-bold rounded-lg border shrink-0 cursor-pointer shadow-xs"
-                    style={{
-                      backgroundColor: 'var(--c3)',
-                      borderColor: 'rgba(var(--c3-rgb), 0.9)',
-                      color: 'var(--ink-primary)',
-                    }}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d] hover:bg-white transition-colors shrink-0 cursor-pointer shadow-xs"
                   >
                     Detay
                   </button>
@@ -275,22 +229,15 @@ export const HotspotsView: React.FC<Props> = ({
       {(activeSubTab === 'all' || activeSubTab === 'hotspots') && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <FileCode className="w-4 h-4" />
-            <h3 className="text-xs font-black uppercase tracking-wider">
-              Kaynak Kod Sıcak Noktaları (Hotspots) ({filteredHotspots.length})
+            <FileCode className="w-4 h-4 text-[#241c1d]" />
+            <h3 className="text-xs font-bold text-[#241c1d]">
+              Kaynak Kod Sıcak Noktaları ({filteredHotspots.length})
             </h3>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredHotspots.length === 0 ? (
-              <div
-                className="p-8 rounded-2xl border text-center text-xs font-semibold shadow-sm"
-                style={{
-                  backgroundColor: 'rgba(var(--c1-rgb), 0.2)',
-                  borderColor: 'var(--c1)',
-                  color: 'var(--ink-muted)',
-                }}
-              >
+              <div className="p-8 rounded-xl border border-[#e8ded9] bg-[#f9efec] text-center text-xs text-[#8c8082]">
                 Seçilen filtrede sıcak nokta bulunamadı.
               </div>
             ) : (
@@ -305,7 +252,7 @@ export const HotspotsView: React.FC<Props> = ({
                 const evidenceList = Array.isArray(hotspot.evidence) && hotspot.evidence.length > 0
                   ? hotspot.evidence.map((e) => `${e.metric}: ${e.value} - ${e.description}`)
                   : [
-                      `Son dönemde ${codeChurn.toLocaleString()} satır kod dalgalanması (churn) gerçekleşti.`,
+                      `Son dönemde ${codeChurn.toLocaleString()} satır kod dalgalanması gerçekleşti.`,
                       `${contributorsCount} farklı geliştirici bu dosyayı düzenledi.`,
                       `Hata düzeltme oranı %${bugFixRatio} seviyesinde (${bugFixesCount} düzeltme).`,
                     ];
@@ -323,66 +270,37 @@ export const HotspotsView: React.FC<Props> = ({
                 return (
                   <div
                     key={idx}
-                    className="p-5 rounded-2xl border transition-all space-y-4 shadow-sm hover:scale-100.5"
-                    style={{
-                      backgroundColor: 'rgba(var(--c1-rgb), 0.25)',
-                      borderColor: 'var(--c1)',
-                    }}
+                    className="p-4 rounded-xl border border-[#e8ded9] bg-[#f9efec] hover:bg-[#fff4f0] transition-all space-y-3 shadow-xs"
                   >
-                    {/* Üst Satır: Dosya Yolu & Rozetler */}
+                    {/* Üst Satır: Dosya Yolu & Eylemler */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="p-2 rounded-xl border shadow-xs"
-                          style={{
-                            backgroundColor: 'var(--c3)',
-                            borderColor: 'rgba(var(--c3-rgb), 0.8)',
-                          }}
-                        >
-                          <FileCode className="w-4 h-4" style={{ color: 'var(--ink-primary)' }} />
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d] shrink-0">
+                          <FileCode className="w-4 h-4" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span
-                              className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md border"
-                              style={{
-                                backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-                                borderColor: 'var(--c1)',
-                                color: 'var(--ink-primary)',
-                              }}
-                            >
+                            <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] font-bold">
                               {hotspot.repo_name}
                             </span>
-                            <span
-                              className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border"
-                              style={{
-                                backgroundColor: 'var(--c3)',
-                                borderColor: 'rgba(var(--c3-rgb), 0.9)',
-                                color: 'var(--ink-primary)',
-                              }}
-                            >
-                              {RISK_TR_MAP[hotspot.risk_level] || hotspot.risk_level} RİSK
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d]">
+                              {RISK_TR_MAP[hotspot.risk_level] || hotspot.risk_level} Risk
                             </span>
                           </div>
-                          <span className="font-mono text-xs font-extrabold block mt-1" style={{ color: 'var(--ink-primary)' }}>
+                          <span className="font-mono text-xs font-bold text-[#241c1d] block mt-1 truncate">
                             {hotspot.path}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
                         <button
                           onClick={() => handleTriggerRefactor(hotspot.path, hotspot.repo_name)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black border transition-all hover:scale-102 cursor-pointer shadow-xs"
-                          style={{
-                            backgroundColor: 'var(--c3)',
-                            borderColor: 'rgba(var(--c3-rgb), 0.9)',
-                            color: 'var(--ink-primary)',
-                          }}
-                          title="Gemini ile bu sıcak nokta için mimari refactoring planı al"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-colors cursor-pointer border border-[#e8ded9] shadow-xs"
+                          title="Gemini ile mimari refactoring planı al"
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>Refactor Planı</span>
+                          <Sparkles className="w-3.5 h-3.5 text-[#241c1d]" />
+                          <span>Refactor</span>
                         </button>
 
                         <button
@@ -396,86 +314,52 @@ export const HotspotsView: React.FC<Props> = ({
                               actionPlan: actionPlanList,
                             })
                           }
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all hover:scale-102 cursor-pointer shadow-xs"
-                          style={{
-                            backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-                            borderColor: 'var(--c1)',
-                            color: 'var(--ink-primary)',
-                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d] hover:bg-white transition-colors cursor-pointer shadow-xs"
                         >
-                          <HelpCircle className="w-3.5 h-3.5" />
+                          <HelpCircle className="w-3.5 h-3.5 text-[#241c1d]" />
                           <span>Neden?</span>
                         </button>
 
                         <button
                           onClick={() => onAskAboutFile(hotspot.path, hotspot.repo_name)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-all hover:scale-102 cursor-pointer shadow-xs"
-                          style={{
-                            backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-                            borderColor: 'var(--c1)',
-                            color: 'var(--ink-primary)',
-                          }}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d] hover:bg-white transition-colors cursor-pointer shadow-xs"
                         >
-                          AI Analizi
+                          AI İncele
                         </button>
                       </div>
                     </div>
 
                     {/* Metrik Rozetleri Izgarası */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                      <div
-                        className="p-2.5 rounded-xl border flex items-center gap-2.5 shadow-xs"
-                        style={{
-                          backgroundColor: 'rgba(var(--c2-rgb), 0.8)',
-                          borderColor: 'var(--c1)',
-                        }}
-                      >
-                        <GitCommit className="w-4 h-4" style={{ color: 'var(--ink-muted)' }} />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                      <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] flex items-center gap-2">
+                        <GitCommit className="w-3.5 h-3.5 text-[#5c5254]" />
                         <div>
-                          <span className="text-[10px] block" style={{ color: 'var(--ink-muted)' }}>Commit Sayısı</span>
-                          <span className="text-xs font-black" style={{ color: 'var(--ink-primary)' }}>{modificationsCount}</span>
+                          <span className="text-[10px] block text-[#5c5254]">Commit</span>
+                          <span className="text-xs font-bold text-[#241c1d]">{modificationsCount}</span>
                         </div>
                       </div>
 
-                      <div
-                        className="p-2.5 rounded-xl border flex items-center gap-2.5 shadow-xs"
-                        style={{
-                          backgroundColor: 'rgba(var(--c2-rgb), 0.8)',
-                          borderColor: 'var(--c1)',
-                        }}
-                      >
-                        <Bug className="w-4 h-4" style={{ color: 'var(--ink-muted)' }} />
+                      <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] flex items-center gap-2">
+                        <Bug className="w-3.5 h-3.5 text-[#5c5254]" />
                         <div>
-                          <span className="text-[10px] block" style={{ color: 'var(--ink-muted)' }}>Hata Düzeltmesi</span>
-                          <span className="text-xs font-black" style={{ color: 'var(--ink-primary)' }}>{bugFixesCount}</span>
+                          <span className="text-[10px] block text-[#5c5254]">Hata Çözümü</span>
+                          <span className="text-xs font-bold text-[#241c1d]">{bugFixesCount}</span>
                         </div>
                       </div>
 
-                      <div
-                        className="p-2.5 rounded-xl border flex items-center gap-2.5 shadow-xs"
-                        style={{
-                          backgroundColor: 'rgba(var(--c2-rgb), 0.8)',
-                          borderColor: 'var(--c1)',
-                        }}
-                      >
-                        <Code2 className="w-4 h-4" style={{ color: 'var(--ink-muted)' }} />
+                      <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] flex items-center gap-2">
+                        <Code2 className="w-3.5 h-3.5 text-[#5c5254]" />
                         <div>
-                          <span className="text-[10px] block" style={{ color: 'var(--ink-muted)' }}>Toplam Churn</span>
-                          <span className="text-xs font-black" style={{ color: 'var(--ink-primary)' }}>{codeChurn.toLocaleString()} satır</span>
+                          <span className="text-[10px] block text-[#5c5254]">Toplam Churn</span>
+                          <span className="text-xs font-bold text-[#241c1d]">{codeChurn.toLocaleString()} satır</span>
                         </div>
                       </div>
 
-                      <div
-                        className="p-2.5 rounded-xl border flex items-center gap-2.5 shadow-xs"
-                        style={{
-                          backgroundColor: 'rgba(var(--c2-rgb), 0.8)',
-                          borderColor: 'var(--c1)',
-                        }}
-                      >
-                        <Users className="w-4 h-4" style={{ color: 'var(--ink-muted)' }} />
+                      <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-[#5c5254]" />
                         <div>
-                          <span className="text-[10px] block" style={{ color: 'var(--ink-muted)' }}>Geliştirici Sayısı</span>
-                          <span className="text-xs font-black" style={{ color: 'var(--ink-primary)' }}>{contributorsCount} yazar</span>
+                          <span className="text-[10px] block text-[#5c5254]">Geliştirici</span>
+                          <span className="text-xs font-bold text-[#241c1d]">{contributorsCount} yazar</span>
                         </div>
                       </div>
                     </div>
@@ -486,38 +370,23 @@ export const HotspotsView: React.FC<Props> = ({
           </div>
         </div>
       )}
+
       {/* 3. Yapay Zeka Refactoring Önerisi Modalı */}
       {activeHotspotForRefactor && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md overflow-y-auto"
-          style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
-        >
-          <div
-            className="w-full max-w-2xl p-6 rounded-2xl border space-y-5 shadow-2xl animate-in zoom-in-95 my-8"
-            style={{
-              backgroundColor: 'var(--c2)',
-              borderColor: 'var(--c1)',
-              color: 'var(--ink-primary)',
-            }}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto font-sans">
+          <div className="w-full max-w-2xl p-6 rounded-2xl border border-[#e8ded9] bg-[#f9efec] space-y-5 shadow-2xl animate-in zoom-in-95 my-8 text-[#241c1d]">
             {/* Modal Başlığı */}
-            <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--c1)' }}>
+            <div className="flex items-center justify-between border-b border-[#e8ded9] pb-4">
               <div className="flex items-center gap-3">
-                <div
-                  className="p-2 rounded-xl border shadow-xs"
-                  style={{
-                    backgroundColor: 'var(--c3)',
-                    borderColor: 'rgba(var(--c3-rgb), 0.9)',
-                  }}
-                >
-                  <Brain className="w-5 h-5" style={{ color: 'var(--ink-primary)' }} />
+                <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d] shadow-xs">
+                  <Brain className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-extrabold font-mono">{activeHotspotForRefactor.path}</span>
-                  </div>
-                  <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                    {activeHotspotForRefactor.repo} deposu için Gemini Destekli Refactoring Planı
+                  <span className="text-xs font-bold font-mono text-[#241c1d]">
+                    {activeHotspotForRefactor.path}
+                  </span>
+                  <span className="text-[11px] text-[#5c5254] block mt-0.5">
+                    {activeHotspotForRefactor.repo} deposu için Gemini Refactoring Planı
                   </span>
                 </div>
               </div>
@@ -527,11 +396,7 @@ export const HotspotsView: React.FC<Props> = ({
                   setActiveHotspotForRefactor(null);
                   setRefactorData(null);
                 }}
-                className="p-1.5 rounded-xl border cursor-pointer hover:opacity-80"
-                style={{
-                  backgroundColor: 'var(--c1)',
-                  borderColor: 'rgba(var(--c1-rgb), 0.8)',
-                }}
+                className="p-1.5 rounded-lg border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d] hover:bg-white cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -540,13 +405,13 @@ export const HotspotsView: React.FC<Props> = ({
             {/* Yükleniyor Durumu */}
             {hotspotRefactorMutation.isPending && !refactorData && (
               <div className="py-12 text-center space-y-3">
-                <div className="inline-block animate-spin p-3 rounded-full border-2 border-dashed border-current">
+                <div className="inline-block animate-spin p-3 rounded-full border-2 border-dashed border-[#241c1d] text-[#241c1d]">
                   <Sparkles className="w-6 h-6" />
                 </div>
-                <p className="text-sm font-bold">
-                  Gemini bu dosyadaki kod churn ve hata paternlerini inceleyerek mimari refactoring planı hazırlıyor...
+                <p className="text-sm font-bold text-[#241c1d]">
+                  Gemini kod churn ve hata paternlerini inceleyerek mimari refactoring planı hazırlıyor...
                 </p>
-                <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                <p className="text-xs text-[#5c5254]">
                   SOLID prensipleri ve tasarım kalıpları modelleniyor
                 </p>
               </div>
@@ -555,42 +420,31 @@ export const HotspotsView: React.FC<Props> = ({
             {refactorData && (
               <div className="space-y-4 text-xs leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
                 {/* Tasarım Kalıbı ve Etki */}
-                <div
-                  className="p-4 rounded-xl border flex items-start gap-4 shadow-xs"
-                  style={{
-                    backgroundColor: 'rgba(var(--c1-rgb), 0.35)',
-                    borderColor: 'var(--c1)',
-                  }}
-                >
-                  <div className="p-3 rounded-xl border shrink-0" style={{ backgroundColor: 'var(--c3)', borderColor: 'rgba(var(--c3-rgb), 0.8)' }}>
-                    <Code className="w-5 h-5" style={{ color: 'var(--ink-primary)' }} />
+                <div className="p-4 rounded-xl border border-[#e8ded9] bg-[#fff4f0] flex items-start gap-3.5 shadow-xs">
+                  <div className="p-2 rounded-lg bg-[#f9efec] border border-[#e8ded9] text-[#241c1d] shrink-0">
+                    <Code className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full border inline-block mb-1" style={{ backgroundColor: 'var(--c3)', borderColor: 'rgba(var(--c3-rgb), 0.9)' }}>
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[#f6f3f4] text-[#241c1d] border border-[#e8ded9] inline-block mb-1">
                       Önerilen Tasarım Kalıbı
                     </span>
-                    <h4 className="font-extrabold text-sm mb-1" style={{ color: 'var(--ink-primary)' }}>
+                    <h4 className="font-bold text-sm text-[#241c1d] mb-1">
                       {refactorData.proposedDesignPattern}
                     </h4>
-                    <p style={{ color: 'var(--ink-secondary)' }}>{refactorData.expectedImpact}</p>
+                    <p className="text-[#5c5254]">{refactorData.expectedImpact}</p>
                   </div>
                 </div>
 
                 {/* Tespit Edilen Anti-Pattern'ler */}
                 <div className="space-y-2">
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider" style={{ color: 'var(--ink-primary)' }}>
+                  <h4 className="font-bold text-xs text-[#241c1d] uppercase tracking-wider">
                     Tespit Edilen Anti-Pattern ve Riskler
                   </h4>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {refactorData.antiPatternsDetected.map((pattern, idx) => (
                       <span
                         key={idx}
-                        className="px-2.5 py-1 rounded-lg border text-[11px] font-bold"
-                        style={{
-                          backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-                          borderColor: 'var(--c1)',
-                          color: 'var(--ink-primary)',
-                        }}
+                        className="px-2.5 py-1 rounded-md border border-[#e8ded9] bg-[#fff4f0] text-[11px] font-semibold text-[#241c1d]"
                       >
                         {pattern}
                       </span>
@@ -600,31 +454,19 @@ export const HotspotsView: React.FC<Props> = ({
 
                 {/* Adım Adım Refactoring Rehberi */}
                 <div className="space-y-2">
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider" style={{ color: 'var(--ink-primary)' }}>
+                  <h4 className="font-bold text-xs text-[#241c1d] uppercase tracking-wider">
                     Uygulama Adımları
                   </h4>
                   <ol className="space-y-2">
                     {refactorData.refactorSteps.map((step, idx) => (
                       <li
                         key={idx}
-                        className="p-3 rounded-xl border flex items-start gap-2.5 font-medium"
-                        style={{
-                          backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-                          borderColor: 'var(--c1)',
-                          color: 'var(--ink-primary)',
-                        }}
+                        className="p-3 rounded-lg border border-[#e8ded9] bg-[#fff4f0] flex items-start gap-2.5"
                       >
-                        <span
-                          className="w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 border"
-                          style={{
-                            backgroundColor: 'var(--c3)',
-                            borderColor: 'rgba(var(--c3-rgb), 0.9)',
-                            color: 'var(--ink-primary)',
-                          }}
-                        >
+                        <span className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9efec] text-[#241c1d] border border-[#e8ded9]">
                           {idx + 1}
                         </span>
-                        <span className="text-[11px] leading-relaxed">{step}</span>
+                        <span className="text-[#5c5254] leading-relaxed font-medium">{step}</span>
                       </li>
                     ))}
                   </ol>
@@ -633,36 +475,24 @@ export const HotspotsView: React.FC<Props> = ({
                 {/* Örnek Kod Şablonu (Varsa) */}
                 {refactorData.sampleCodeSnippet && (
                   <div className="space-y-2">
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider" style={{ color: 'var(--ink-primary)' }}>
+                    <h4 className="font-bold text-xs text-[#241c1d] uppercase tracking-wider">
                       Örnek Yeniden Yapılandırma Kodu
                     </h4>
-                    <pre
-                      className="p-3 rounded-xl border font-mono text-[11px] overflow-x-auto whitespace-pre-wrap leading-relaxed"
-                      style={{
-                        backgroundColor: 'rgba(var(--c1-rgb), 0.5)',
-                        borderColor: 'var(--c1)',
-                        color: 'var(--ink-primary)',
-                      }}
-                    >
+                    <pre className="p-3.5 rounded-lg border border-[#e8ded9] bg-[#fff4f0] font-mono text-[11px] text-[#241c1d] overflow-x-auto whitespace-pre-wrap leading-relaxed">
                       {refactorData.sampleCodeSnippet}
                     </pre>
                   </div>
                 )}
 
                 {/* Alt Eylemler */}
-                <div className="pt-3 border-t flex justify-end gap-2" style={{ borderColor: 'var(--c1)' }}>
+                <div className="pt-3 border-t border-[#e8ded9] flex justify-end gap-2">
                   <button
                     onClick={() => {
                       onAskAboutFile(activeHotspotForRefactor.path, activeHotspotForRefactor.repo);
                       setActiveHotspotForRefactor(null);
                       setRefactorData(null);
                     }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-xs"
-                    style={{
-                      backgroundColor: 'var(--c3)',
-                      borderColor: 'rgba(var(--c3-rgb), 0.9)',
-                      color: 'var(--ink-primary)',
-                    }}
+                    className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-colors cursor-pointer border border-[#e8ded9] shadow-xs"
                   >
                     AI Analistine Soru Sor
                   </button>
@@ -671,11 +501,7 @@ export const HotspotsView: React.FC<Props> = ({
                       setActiveHotspotForRefactor(null);
                       setRefactorData(null);
                     }}
-                    className="px-3 py-2 rounded-xl text-xs font-bold border cursor-pointer"
-                    style={{
-                      backgroundColor: 'var(--c1)',
-                      borderColor: 'rgba(var(--c1-rgb), 0.8)',
-                    }}
+                    className="px-3 py-2 rounded-lg text-xs font-bold border border-[#e8ded9] bg-[#f6f3f4] text-[#241c1d] hover:bg-white transition-colors cursor-pointer"
                   >
                     Kapat
                   </button>

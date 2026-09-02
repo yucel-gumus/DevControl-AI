@@ -5,6 +5,7 @@ import {
   Terminal,
   FolderGit2,
   Github,
+  Sparkles,
 } from 'lucide-react';
 import { GitHubUser } from '../types.js';
 
@@ -51,7 +52,7 @@ export const Sidebar: React.FC<Props> = ({
       id: 'ask' as ActiveTab,
       label: 'Yapay Zeka Analisti',
       icon: Terminal,
-      highlight: true,
+      isAi: true,
       description: 'Mühendislik Soru & Cevap',
     },
     {
@@ -65,40 +66,33 @@ export const Sidebar: React.FC<Props> = ({
   return (
     <aside
       id="app-sidebar"
-      className="w-64 border-r flex flex-col justify-between shrink-0 h-screen sticky top-0 font-sans shadow-lg"
-      style={{
-        backgroundColor: 'rgba(var(--c1-rgb), 0.25)',
-        borderColor: 'var(--c1)',
-        color: 'var(--ink-primary)',
-      }}
+      className="w-64 bg-[#f9efec] border-r border-[#e8ded9] flex flex-col justify-between shrink-0 h-screen sticky top-0 font-sans select-none z-20 text-[#241c1d]"
     >
       {/* Marka Başlığı */}
       <div>
-        <div className="p-5 border-b" style={{ borderColor: 'var(--c1)' }}>
+        <div className="px-5 py-5 border-b border-[#e8ded9]">
           <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shadow-xs"
-              style={{
-                backgroundColor: 'var(--c3)',
-                color: 'var(--ink-primary)',
-                border: '1px solid rgba(var(--c3-rgb), 0.8)',
-              }}
-            >
+            <div className="w-8 h-8 rounded-lg bg-[#fff4f0] border border-[#e8ded9] flex items-center justify-center text-[#241c1d] font-bold text-xs shadow-xs">
               DC
             </div>
             <div className="flex flex-col">
-              <h1 className="font-extrabold text-base tracking-tight" style={{ color: 'var(--ink-primary)' }}>
-                DevControl AI
-              </h1>
-              <span className="text-[10px] font-bold" style={{ color: 'var(--ink-muted)' }}>
-                Mühendislik Zekası Platformu
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-sm text-[#241c1d] tracking-tight">
+                  DevControl
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9]">
+                  AI
+                </span>
+              </div>
+              <span className="text-[11px] text-[#5c5254] font-normal">
+                Mühendislik Zekası
               </span>
             </div>
           </div>
         </div>
 
         {/* Ana Menü Listesi */}
-        <nav className="p-3 space-y-2">
+        <nav className="p-3 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -107,42 +101,33 @@ export const Sidebar: React.FC<Props> = ({
                 key={item.id}
                 id={`nav-item-${item.id}`}
                 onClick={() => onSelectTab(item.id)}
-                className="w-full flex items-center justify-between p-3 rounded-xl text-xs font-semibold transition-all cursor-pointer text-left shadow-xs"
-                style={{
-                  backgroundColor: isActive ? 'var(--c3)' : 'rgba(var(--c2-rgb), 0.6)',
-                  color: 'var(--ink-primary)',
-                  boxShadow: isActive ? '0 2px 10px rgba(var(--c3-rgb), 0.5)' : 'none',
-                  border: isActive ? '1px solid rgba(var(--c3-rgb), 0.9)' : '1px solid var(--c1)',
-                }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs transition-all cursor-pointer text-left group relative ${
+                  isActive
+                    ? 'bg-[#fff4f0] text-[#241c1d] font-bold border border-[#e8ded9] shadow-xs'
+                    : 'text-[#5c5254] hover:text-[#241c1d] hover:bg-[#fff4f0]/60 border border-transparent'
+                }`}
               >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="p-1.5 rounded-lg border shrink-0"
-                    style={{
-                      backgroundColor: isActive ? 'rgba(var(--c2-rgb), 0.9)' : 'var(--c1)',
-                      borderColor: 'rgba(var(--c1-rgb), 0.8)',
-                    }}
-                  >
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-extrabold block text-xs">{item.label}</span>
-                    <span className="text-[10px] block opacity-75 font-normal">{item.description}</span>
-                  </div>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Icon
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      isActive
+                        ? 'text-[#241c1d]'
+                        : 'text-[#5c5254] group-hover:text-[#241c1d]'
+                    }`}
+                  />
+                  <span className="truncate">{item.label}</span>
                 </div>
 
-                {item.badge !== undefined && (
-                  <span
-                    className="px-2 py-0.5 rounded-full text-[10px] font-black border shrink-0"
-                    style={{
-                      backgroundColor: 'var(--c1)',
-                      borderColor: 'rgba(var(--c1-rgb), 0.8)',
-                      color: 'var(--ink-primary)',
-                    }}
-                  >
-                    {item.badge}
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {item.isAi && (
+                    <Sparkles className="w-3.5 h-3.5 text-[#241c1d]" />
+                  )}
+                  {item.badge !== undefined && (
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9]">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -150,60 +135,45 @@ export const Sidebar: React.FC<Props> = ({
       </div>
 
       {/* Kullanıcı & GitHub Durum Altlığı */}
-      <div className="p-4 border-t space-y-3" style={{ borderColor: 'var(--c1)' }}>
+      <div className="p-3 border-t border-[#e8ded9] space-y-2">
         {/* Canlı GitHub Durumu */}
-        <div
-          className="flex items-center justify-between px-3 py-2 rounded-xl border text-xs shadow-xs"
-          style={{
-            backgroundColor: 'rgba(var(--c2-rgb), 0.85)',
-            borderColor: 'var(--c1)',
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <Github className="w-3.5 h-3.5" style={{ color: 'var(--ink-primary)' }} />
-            <span className="text-[11px] font-semibold" style={{ color: 'var(--ink-secondary)' }}>GitHub Bağlantısı</span>
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] text-xs">
+          <div className="flex items-center gap-2 text-[#241c1d]">
+            <Github className="w-3.5 h-3.5 text-[#241c1d]" />
+            <span className="text-[11px] font-medium">GitHub</span>
           </div>
-          <span
-            className="text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5"
-            style={{
-              backgroundColor: 'var(--c3)',
-              borderColor: 'rgba(var(--c3-rgb), 0.8)',
-              color: 'var(--ink-primary)',
-            }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--ink-primary)' }}></span>
-            {authenticated ? 'Bağlı' : 'Bekleniyor'}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                authenticated ? 'bg-[#241c1d]' : 'bg-[#8c8082]'
+              }`}
+            />
+            <span className="text-[10px] font-semibold text-[#241c1d]">
+              {authenticated ? 'Bağlı' : 'Bekleniyor'}
+            </span>
+          </div>
         </div>
 
         {/* Kullanıcı Kartı */}
-        <div className="flex items-center gap-3 px-1">
+        <div className="flex items-center gap-2.5 px-2 py-1.5">
           {user?.avatar_url ? (
             <img
               src={user.avatar_url}
               alt={user.name}
-              className="w-8 h-8 rounded-full border object-cover shrink-0"
-              style={{ borderColor: 'var(--c1)' }}
+              className="w-7 h-7 rounded-full border border-[#e8ded9] object-cover shrink-0"
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 border"
-              style={{
-                backgroundColor: 'var(--c3)',
-                borderColor: 'var(--c1)',
-                color: 'var(--ink-primary)',
-              }}
-            >
+            <div className="w-7 h-7 rounded-full bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] flex items-center justify-center font-bold text-xs shrink-0">
               U
             </div>
           )}
-          <div className="flex flex-col overflow-hidden">
-            <span className="text-xs font-bold truncate" style={{ color: 'var(--ink-primary)' }}>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold text-[#241c1d] truncate">
               {user?.name || user?.login || 'GitHub Kullanıcısı'}
             </span>
-            <span className="text-[10px] truncate" style={{ color: 'var(--ink-muted)' }}>
-              {user ? `@${user.login}` : 'GitHub hesabı bağlı değil'}
+            <span className="text-[11px] text-[#5c5254] truncate">
+              {user ? `@${user.login}` : 'Hesap bağlı değil'}
             </span>
           </div>
         </div>

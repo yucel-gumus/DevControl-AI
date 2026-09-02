@@ -28,83 +28,57 @@ export const Header: React.FC<Props> = ({
   return (
     <header
       id="app-header"
-      className="h-16 border-b flex items-center justify-between px-8 sticky top-0 z-30 font-sans backdrop-blur-md"
-      style={{
-        backgroundColor: 'rgba(var(--c2-rgb), 0.85)',
-        borderColor: 'var(--c1)',
-        color: 'var(--ink-primary)',
-      }}
+      className="h-14 border-b border-[#e8ded9] flex items-center justify-between px-6 sticky top-0 z-30 font-sans bg-[#f9efec]/95 backdrop-blur-md text-[#241c1d]"
     >
       {/* Başlık ve Gezinme Yolu */}
-      <div className="flex items-center gap-2 text-sm font-semibold">
-        <span style={{ color: 'var(--ink-muted)' }}>DevControl AI</span>
-        <span style={{ color: 'var(--ink-muted)' }}>/</span>
-        <span style={{ color: 'var(--ink-primary)' }} className="font-extrabold">{title}</span>
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-[#5c5254] font-medium">DevControl</span>
+        <span className="text-[#8c8082]">/</span>
+        <span className="text-[#241c1d] font-bold text-sm">{title}</span>
         {subtitle && (
-          <span
-            className="hidden lg:inline text-xs ml-2 pl-2 border-l"
-            style={{ color: 'var(--ink-muted)', borderColor: 'var(--c1)' }}
-          >
+          <span className="hidden lg:inline text-xs text-[#5c5254] pl-2 ml-1 border-l border-[#e8ded9]">
             {subtitle}
           </span>
         )}
       </div>
 
       {/* Genel Eylemler & Sağlık Rozeti */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {/* Sağlık Skoru Kapsülü */}
         {healthScore?.hasData ? (
           <div
-            className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border shadow-xs"
-            style={{
-              backgroundColor: 'rgba(var(--c1-rgb), 0.35)',
-              borderColor: 'var(--c1)',
-              color: 'var(--ink-primary)',
-            }}
-            title={lastSyncAt ? `Son eşitleme: ${new Date(lastSyncAt).toLocaleString('tr-TR')}` : 'Henüz başarılı bir eşitleme yapılmadı.'}
+            className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d] shadow-xs"
+            title={
+              lastSyncAt
+                ? `Son eşitleme: ${new Date(lastSyncAt).toLocaleString('tr-TR')}`
+                : 'Henüz başarılı bir eşitleme yapılmadı.'
+            }
           >
-            <Activity className="w-3.5 h-3.5" style={{ color: 'var(--ink-primary)' }} />
-            <span style={{ color: 'var(--ink-muted)' }}>Mühendislik Sağlığı{isPartial ? ' (kısmi)' : ''}:</span>
-            <span className="font-black">{healthScore.overallScore}/100</span>
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-black border"
-              style={{
-                backgroundColor: 'var(--c3)',
-                borderColor: 'rgba(var(--c3-rgb), 0.8)',
-                color: 'var(--ink-primary)',
-              }}
-            >
-              {isPartial ? 'Kısmi veri' : `Seviye ${healthScore.grade}`}
+            <span className="w-1.5 h-1.5 rounded-full bg-[#241c1d]" />
+            <span className="text-[#5c5254] text-[11px]">Sağlık{isPartial ? ' (kısmi)' : ''}:</span>
+            <span className="font-bold text-[#241c1d]">{healthScore.overallScore}/100</span>
+            <span className="px-1.5 py-0.2 rounded bg-[#f6f3f4] text-[#241c1d] text-[10px] font-bold border border-[#e8ded9]">
+              {isPartial ? 'Kısmi' : `Seviye ${healthScore.grade}`}
             </span>
           </div>
         ) : healthScore ? (
           <div
-            className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border shadow-xs"
-            style={{
-              backgroundColor: 'rgba(var(--c1-rgb), 0.35)',
-              borderColor: 'var(--c1)',
-              color: 'var(--ink-muted)',
-            }}
+            className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs border border-[#e8ded9] bg-[#fff4f0] text-[#5c5254]"
             title={lastSyncAt ? `Son eşitleme: ${new Date(lastSyncAt).toLocaleString('tr-TR')}` : undefined}
           >
-            <Activity className="w-3.5 h-3.5" style={{ color: 'var(--ink-muted)' }} />
-            <span>GitHub verisi bekleniyor</span>
+            <Activity className="w-3.5 h-3.5 text-[#5c5254]" />
+            <span className="text-[11px]">GitHub verisi bekleniyor</span>
           </div>
         ) : null}
 
         {/* GitHub API Rate Limit Göstergesi */}
         {rateLimitStatus && (
           <div
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-xs"
-            style={{
-              backgroundColor: 'rgba(var(--c2-rgb), 0.9)',
-              borderColor: 'var(--c1)',
-              color: 'var(--ink-secondary)',
-            }}
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border border-[#e8ded9] bg-[#fff4f0] text-[#5c5254]"
             title={`GitHub API Kalan İstek: ${rateLimitStatus.remaining} / ${rateLimitStatus.limit}`}
           >
-            <Gauge className="w-3.5 h-3.5" style={{ color: 'var(--ink-primary)' }} />
-            <span className="font-bold text-[11px]">API: {rateLimitStatus.remaining.toLocaleString()} / {rateLimitStatus.limit.toLocaleString()}</span>
+            <Gauge className="w-3 h-3 text-[#5c5254]" />
+            <span>API: {rateLimitStatus.remaining.toLocaleString()}</span>
           </div>
         )}
 
@@ -112,31 +86,21 @@ export const Header: React.FC<Props> = ({
         <button
           id="header-btn-ask-ai"
           onClick={onOpenAskAi}
-          className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all hover:scale-102 cursor-pointer shadow-xs"
-          style={{
-            backgroundColor: 'var(--c1)',
-            borderColor: 'rgba(var(--c1-rgb), 0.8)',
-            color: 'var(--ink-primary)',
-          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-all cursor-pointer shadow-xs"
         >
-          <Terminal className="w-3.5 h-3.5" />
-          <span>Yapay Zeka Analisti</span>
+          <Terminal className="w-3.5 h-3.5 text-[#241c1d]" />
+          <span>Yapay Zeka</span>
         </button>
 
-        {/* Verileri Yenile Butonu (%10 Vurgu) */}
+        {/* Verileri Yenile Butonu */}
         <button
           id="header-btn-sync"
           onClick={onSync}
           disabled={isSyncing}
-          className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-102 cursor-pointer shadow-sm disabled:opacity-50 border"
-          style={{
-            backgroundColor: 'var(--c3)',
-            borderColor: 'rgba(var(--c3-rgb), 0.9)',
-            color: 'var(--ink-primary)',
-          }}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-all cursor-pointer shadow-xs disabled:opacity-50 border border-[#e8ded9]"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-          <span>{isSyncing ? 'Yenileniyor...' : 'Verileri Yenile'}</span>
+          <span>{isSyncing ? 'Yenileniyor...' : 'Yenile'}</span>
         </button>
       </div>
     </header>

@@ -152,8 +152,7 @@ export default function App() {
 
   return (
     <div
-      className="flex h-screen font-sans antialiased overflow-hidden"
-      style={{ backgroundColor: 'var(--dominant-bg)', color: 'var(--ink-primary)' }}
+      className="flex h-screen font-sans antialiased overflow-hidden bg-[#f6f3f4] text-[#241c1d]"
     >
       <Sidebar
         activeTab={activeTab}
@@ -164,7 +163,7 @@ export default function App() {
         risksCount={risks.filter((r) => r.severity === 'CRITICAL' || r.severity === 'HIGH').length}
       />
 
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative" style={{ backgroundColor: 'var(--dominant-bg)' }}>
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative bg-[#f6f3f4]">
         <Header
           title={getTabTitle()}
           subtitle={getTabSubtitle()}
@@ -176,38 +175,29 @@ export default function App() {
           rateLimitStatus={rateLimitStatus}
         />
 
-        <main className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto px-6 py-6 lg:px-8 lg:py-7">
+          <div className="max-w-7xl mx-auto space-y-6">
             {isInitialLoading && (
               <div
-                className="mb-5 rounded-2xl border px-4 py-3 text-sm font-semibold"
-                style={{
-                  backgroundColor: 'rgba(var(--c1-rgb), 0.3)',
-                  borderColor: 'var(--c1)',
-                  color: 'var(--ink-secondary)',
-                }}
+                className="rounded-xl border border-[#e8ded9] bg-[#f9efec] px-4 py-3 text-xs font-medium text-[#241c1d] flex items-center gap-2.5 shadow-xs"
                 role="status"
                 aria-live="polite"
               >
-                GitHub telemetrisi ve mühendislik göstergeleri yükleniyor...
+                <div className="w-2 h-2 rounded-full bg-[#241c1d] animate-ping shrink-0" />
+                <span>GitHub telemetrisi ve mühendislik göstergeleri yükleniyor...</span>
               </div>
             )}
 
             {visibleErrors.length > 0 && (
               <div
-                className="mb-5 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                style={{
-                  backgroundColor: 'rgba(var(--c3-rgb), 0.35)',
-                  borderColor: 'var(--c3)',
-                  color: 'var(--ink-primary)',
-                }}
+                className="rounded-xl border border-[#e8ded9] bg-[#f9efec] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                 role="alert"
                 aria-live="assertive"
               >
-                <div className="text-sm font-semibold">
+                <div className="text-xs font-medium text-[#241c1d]">
                   <p>{visibleErrors[0]}</p>
                   {visibleErrors.length > 1 && (
-                    <p className="text-xs mt-1" style={{ color: 'var(--ink-secondary)' }}>
+                    <p className="text-[11px] mt-1 text-[#5c5254]">
                       Ayrıca {visibleErrors.length - 1} veri isteği daha tamamlanamadı.
                     </p>
                   )}
@@ -215,12 +205,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="shrink-0 px-3 py-2 rounded-xl border text-xs font-bold cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--c2)',
-                    borderColor: 'var(--c1)',
-                    color: 'var(--ink-primary)',
-                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-lg border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d] text-xs font-semibold hover:bg-white transition-colors cursor-pointer"
                 >
                   Tekrar dene
                 </button>
