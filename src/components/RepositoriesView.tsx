@@ -20,8 +20,10 @@ import { useRepoReview } from '../hooks/useMetrics.js';
 
 interface Props {
   repositories: Repository[];
+  hotspots?: any[];
   user: GitHubUser | null;
-  onToggleRepo: (repoId: number) => void;
+  onToggleSelectRepo?: (repoId: string) => void;
+  onToggleRepo?: (repoId: any) => void;
   onAskAboutRepo: (repoName: string) => void;
   selectedRepo: Repository | null;
   onSelectRepo: (repo: Repository | null) => void;
@@ -35,7 +37,9 @@ interface Props {
 
 export const RepositoriesView: React.FC<Props> = ({
   repositories = [],
+  hotspots = [],
   user,
+  onToggleSelectRepo,
   onToggleRepo,
   onAskAboutRepo,
   selectedRepo,
@@ -226,7 +230,12 @@ export const RepositoriesView: React.FC<Props> = ({
 
                   <div className="flex items-center justify-between gap-2">
                     <button
-                      onClick={() => onToggleRepo(repo.id)}
+                      onClick={() => {
+                        const toggleFn = onToggleSelectRepo || onToggleRepo;
+                        if (toggleFn) {
+                          toggleFn(String(repo.id));
+                        }
+                      }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'

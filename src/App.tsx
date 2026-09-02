@@ -257,6 +257,7 @@ export default function App() {
                 hotspots={hotspots}
                 user={user}
                 onToggleSelectRepo={handleToggleSelectRepo}
+                onToggleRepo={handleToggleSelectRepo}
                 onAskAboutRepo={handleAskAboutRepo}
                 selectedRepo={selectedRepo}
                 onSelectRepo={setSelectedRepo}
