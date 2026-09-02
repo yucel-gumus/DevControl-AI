@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+:root {
+  /* ==========================================================================
+     DEVCONTROL AI — 3 RENK MERKEZİ PALET (60 - 30 - 10 KURALI)
+     İleride renk değiştirmek için sadece aşağıdaki 3 hex kodunu güncelleyin:
+     ========================================================================== */
+  --c1: #B5DEF6; /* %30 SECONDARY: Paneller, Kartlar, Kenarlıklar, Yapısal Alanlar */
+  --c2: #EEF5DB; /* %60 DOMINANT: Ana Tuval, Sayfa Tabanı, Geniş Yüzeyler */
+  --c3: #E2D0FB; /* %10 ACCENT: Hero Butonlar, Aktif Sekmeler, Vurgu Rozetleri */
+
+  /* RGB Kanalları */
+  --c1-rgb: 181, 222, 246;
+  --c2-rgb: 238, 245, 219;
+  --c3-rgb: 226, 208, 251;
+
+  /* 60 - 30 - 10 Semantik Rol Eşlemeleri */
+  --dominant-bg: var(--c2);
+  --secondary-surface: var(--c1);
+  --accent-cta: var(--c3);
+
+  /* Yüksek Kontrastlı Okunabilir Mürekkep (Typography Ink) */
+  --ink-primary: #122129;
+  --ink-secondary: #2d4452;
+  --ink-muted: #516d7d;
+
+  /* Şeffaflık Katmanları (Strictly derived from c1, c2, c3) */
+  --c1-15: rgba(var(--c1-rgb), 0.15);
+  --c1-25: rgba(var(--c1-rgb), 0.25);
+  --c1-50: rgba(var(--c1-rgb), 0.50);
+  --c1-80: rgba(var(--c1-rgb), 0.80);
+
+  --c2-40: rgba(var(--c2-rgb), 0.40);
+  --c2-80: rgba(var(--c2-rgb), 0.80);
+
+  --c3-20: rgba(var(--c3-rgb), 0.20);
+  --c3-40: rgba(var(--c3-rgb), 0.40);
+  --c3-80: rgba(var(--c3-rgb), 0.80);
+
+  /* Kenarlıklar */
+  --border-subtle: rgba(var(--c1-rgb), 0.45);
+  --border-accent: rgba(var(--c3-rgb), 0.80);
+}
+
+@theme {
+  --color-dominant: var(--dominant-bg);
+  --color-secondary: var(--secondary-surface);
+  --color-accent: var(--accent-cta);
+  --color-c1: var(--c1);
+  --color-c2: var(--c2);
+  --color-c3: var(--c3);
+}
+
+/* ==========================================================================
+   UI / UX PRO MAX ORTAK TASARIM YARDIMCILARI (3 RENKLE SINIRLI)
+   ========================================================================== */
+
+body {
+  background-color: var(--dominant-bg);
+  color: var(--ink-primary);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 60% Zemin Alanı */
+.bg-canvas-60 {
+  background-color: var(--c2);
+}
+
+/* 30% Yapısal Kart & Panel Yüzeyi */
+.surface-card-30 {
+  background-color: rgba(var(--c1-rgb), 0.35);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(12px);
+}
+
+.surface-card-hover:hover {
+  background-color: rgba(var(--c1-rgb), 0.55);
+  border-color: var(--c1);
+}
+
+/* 10% Vurgu Butonu & Rozeti */
+.btn-accent-10 {
+  background-color: var(--c3);
+  color: var(--ink-primary);
+  font-weight: 600;
+  border: 1px solid rgba(var(--c3-rgb), 0.9);
+  transition: all 0.2s ease;
+}
+
+.btn-accent-10:hover {
+  background-color: rgba(var(--c3-rgb), 0.85);
+  box-shadow: 0 4px 14px rgba(var(--c3-rgb), 0.4);
+}
+
+.btn-secondary-30 {
+  background-color: var(--c1);
+  color: var(--ink-primary);
+  font-weight: 500;
+  border: 1px solid rgba(var(--c1-rgb), 0.9);
+  transition: all 0.2s ease;
+}
+
+.btn-secondary-30:hover {
+  background-color: rgba(var(--c1-rgb), 0.75);
+}
+
+/* Rozetler (Badges) */
+.badge-accent {
+  background-color: rgba(var(--c3-rgb), 0.35);
+  color: var(--ink-primary);
+  border: 1px solid var(--c3);
+}
+
+.badge-secondary {
+  background-color: rgba(var(--c1-rgb), 0.35);
+  color: var(--ink-primary);
+  border: 1px solid var(--c1);
+}
+
+.badge-dominant {
+  background-color: rgba(var(--c2-rgb), 0.7);
+  color: var(--ink-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Özel İnce Kaydırma Çubuğu */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--c2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--c1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c3);
+}
