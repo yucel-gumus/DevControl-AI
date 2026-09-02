@@ -1,12 +1,12 @@
 /**
  * DevControl AI — 3 Renk Merkezi Palet (60 - 30 - 10 Kuralı)
- * Tam olarak istenen 3 renk: #f6f3f4, #f9efec, #fff4f0
+ * İstenen 3 renk: #b9aba9, #f9b88e, #cdc1b5
  */
 
 export const THEME_PALETTE = {
-  COLOR_60: '#f6f3f4', // 60% Dominant Canvas
-  COLOR_30: '#f9efec', // 30% Secondary Surface (Cards, Panels)
-  COLOR_10: '#fff4f0', // 10% Accent (Buttons, Highlights, Tabs)
+  COLOR_60: '#b9aba9', // 60% Dominant Canvas (Muted Taupe)
+  COLOR_30: '#cdc1b5', // 30% Secondary Surface (Warm Sand / Cards)
+  COLOR_10: '#f9b88e', // 10% Accent (Warm Apricot / Buttons / Badges)
 } as const;
 
 export const THEME_ROLES = {
@@ -19,12 +19,12 @@ export const THEME_ROLES = {
  * Recharts ve veri görselleştirme teması (3 renkle sınırlı)
  */
 export const CHART_THEME = {
-  primary: '#241c1d',
-  secondary: '#5c5254',
-  accent: '#fff4f0',
-  palette: ['#241c1d', '#5c5254', '#8c8082'],
-  gridStroke: '#e8ded9',
-  tooltipBg: '#fff4f0',
-  tooltipBorder: '#e8ded9',
-  textInk: '#241c1d',
+  primary: '#231c1a',
+  secondary: '#f9b88e',
+  accent: '#f9b88e',
+  palette: ['#231c1a', '#f9b88e', '#6e5f5c'],
+  gridStroke: '#a89997',
+  tooltipBg: '#cdc1b5',
+  tooltipBorder: '#918280',
+  textInk: '#231c1a',
 };

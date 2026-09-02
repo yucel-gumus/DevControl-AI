@@ -153,7 +153,7 @@ export default function App() {
 
   return (
     <div
-      className="flex h-screen font-sans antialiased overflow-hidden bg-[#f6f3f4] text-[#241c1d]"
+      className="flex h-screen font-sans antialiased overflow-hidden bg-[#b9aba9] text-[#231c1a]"
     >
       <Sidebar
         activeTab={activeTab}
@@ -164,7 +164,7 @@ export default function App() {
         risksCount={risks.filter((r) => r.severity === 'CRITICAL' || r.severity === 'HIGH').length}
       />
 
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative bg-[#f6f3f4]">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative bg-[#b9aba9]">
         <Header
           title={getTabTitle()}
           subtitle={getTabSubtitle()}
@@ -180,25 +180,25 @@ export default function App() {
           <div className="max-w-7xl mx-auto space-y-6">
             {isInitialLoading && (
               <div
-                className="rounded-xl border border-[#e8ded9] bg-[#f9efec] px-4 py-3 text-xs font-medium text-[#241c1d] flex items-center gap-2.5 shadow-xs"
+                className="rounded-xl border border-[#a89997] bg-[#cdc1b5] px-4 py-3 text-xs font-semibold text-[#231c1a] flex items-center gap-2.5 shadow-xs"
                 role="status"
                 aria-live="polite"
               >
-                <div className="w-2 h-2 rounded-full bg-[#241c1d] animate-ping shrink-0" />
+                <div className="w-2 h-2 rounded-full bg-[#f9b88e] animate-ping shrink-0" />
                 <span>GitHub telemetrisi ve mühendislik göstergeleri yükleniyor...</span>
               </div>
             )}
 
             {visibleErrors.length > 0 && (
               <div
-                className="rounded-xl border border-[#e8ded9] bg-[#f9efec] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                className="rounded-xl border border-[#a89997] bg-[#cdc1b5] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                 role="alert"
                 aria-live="assertive"
               >
-                <div className="text-xs font-medium text-[#241c1d]">
+                <div className="text-xs font-semibold text-[#231c1a]">
                   <p>{visibleErrors[0]}</p>
                   {visibleErrors.length > 1 && (
-                    <p className="text-[11px] mt-1 text-[#5c5254]">
+                    <p className="text-[11px] mt-1 text-[#4a3e3b]">
                       Ayrıca {visibleErrors.length - 1} veri isteği daha tamamlanamadı.
                     </p>
                   )}
@@ -206,7 +206,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="shrink-0 px-3 py-1.5 rounded-lg border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d] text-xs font-semibold hover:bg-white transition-colors cursor-pointer"
+                  className="shrink-0 px-3 py-1.5 rounded-lg border border-[#231c1a]/20 bg-[#f9b88e] text-[#231c1a] text-xs font-bold hover:brightness-105 transition-all cursor-pointer shadow-xs"
                 >
                   Tekrar dene
                 </button>
@@ -272,10 +272,10 @@ export default function App() {
             )}
 
             {/* Alt Bilgi (Footer) - Geliştirici & Referans Bağlantısı */}
-            <footer className="pt-6 pb-4 mt-6 border-t border-[#e8ded9] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#5c5254]">
+            <footer className="pt-6 pb-4 mt-6 border-t border-[#a89997] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#4a3e3b]">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-[#241c1d]">DevControl AI</span>
-                <span className="text-[#8c8082]">·</span>
+                <span className="font-bold text-[#231c1a]">DevControl AI</span>
+                <span className="text-[#6e5f5c]">·</span>
                 <span>Mühendislik Zekası ve Kişisel GitHub Telemetri Platformu</span>
               </div>
               <div className="flex items-center gap-2">
@@ -285,10 +285,10 @@ export default function App() {
                   target="_blank"
                   rel="author external"
                   title="Yücel Gümüş Kişisel Web Sitesi"
-                  className="font-bold text-[#241c1d] hover:underline inline-flex items-center gap-1.5 bg-[#fff4f0] px-2.5 py-1 rounded-lg border border-[#e8ded9] shadow-xs transition-colors hover:bg-white"
+                  className="font-bold text-[#231c1a] hover:underline inline-flex items-center gap-1.5 bg-[#f9b88e] px-2.5 py-1 rounded-lg border border-[#231c1a]/20 shadow-xs transition-all hover:brightness-105"
                 >
                   <span>Yücel Gümüş</span>
-                  <ExternalLink className="w-3 h-3 text-[#241c1d]" />
+                  <ExternalLink className="w-3 h-3 text-[#231c1a]" />
                 </a>
               </div>
             </footer>

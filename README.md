@@ -51,10 +51,10 @@ Bu proje **[Yücel Gümüş](https://yucelgumus.dev/)** tarafından sıfırdan t
 
 ## 🎨 Tasarım Mimarisi (60-30-10 Kuralı)
 Arayüz, modern geliştirici araçları estetiği ve UI/UX standartları gözetilerek **yalnızca 3 renk** ile 60-30-10 kuralına göre tasarlanmıştır:
-- **%60 DOMINANT (`#f6f3f4`):** Ferah, gözü yormayan ana tuval ve sayfa zemini.
-- **%30 SECONDARY (`#f9efec`):** Bento grid kartları, yan menü, üst bar ve yapısal paneller.
-- **%10 ACCENT (`#fff4f0`):** Etkileşimli butonlar, aktif sekme göstergeleri ve durum rozetleri.
-- **Tipografi:** WCAG AAA kontrastlı derin füme mürekkep (`#241c1d`).
+- **%60 DOMINANT (`#b9aba9`):** Dinlendirici, zarif toprak ve taş tonunda geniş ana tuval ve sayfa tabanı.
+- **%30 SECONDARY (`#cdc1b5`):** Açık kumtaşı renginde Bento grid kartları, yan menü, üst bar ve paneller.
+- **%10 ACCENT (`#f9b88e`):** Sıcak kayısı / mercan tonunda etkileşimli butonlar, aktif sekmeler ve durum rozetleri.
+- **Tipografi:** WCAG AAA uyumlu yüksek kontrastlı zengin espresso mürekkep (`#231c1a`).
 
 ---
 

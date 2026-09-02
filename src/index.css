@@ -3,20 +3,20 @@
 :root {
   /* ==========================================================================
      DEVCONTROL AI — 3 RENK MERKEZİ PALET (60 - 30 - 10 KURALI)
-     Tam olarak istenen 3 renk: #f6f3f4, #f9efec, #fff4f0
+     İstenen 3 renk: #b9aba9, #f9b88e, #cdc1b5
      ========================================================================== */
 
-  /* 60% DOMINANT: Ana sayfa tabanı, geniş tuval */
-  --c60: #f6f3f4;
-  --c60-rgb: 246, 243, 244;
+  /* 60% DOMINANT: Ana sayfa tabanı, geniş tuval (#b9aba9) */
+  --c60: #b9aba9;
+  --c60-rgb: 185, 171, 169;
 
-  /* 30% SECONDARY: Kartlar, paneller, kenarlıklar, yan menü, üst çubuk */
-  --c30: #f9efec;
-  --c30-rgb: 249, 239, 236;
+  /* 30% SECONDARY: Kartlar, paneller, kenarlıklar, yan menü, üst çubuk (#cdc1b5) */
+  --c30: #cdc1b5;
+  --c30-rgb: 205, 193, 181;
 
-  /* 10% ACCENT: Butonlar, aktif sekmeler, vurgu hapları, etkileşimli elemanlar */
-  --c10: #fff4f0;
-  --c10-rgb: 255, 244, 240;
+  /* 10% ACCENT: Butonlar, aktif sekmeler, vurgu hapları, etkileşimli elemanlar (#f9b88e) */
+  --c10: #f9b88e;
+  --c10-rgb: 249, 184, 142;
 
   /* Semantik Rol Eşlemeleri */
   --bg-canvas: var(--c60);
@@ -27,15 +27,15 @@
   --secondary-surface: var(--c30);
   --accent-action: var(--c10);
 
-  /* Kenarlıklar (Renk paletiyle uyumlu, sakin ve zarif) */
-  --border-subtle: #e8ded9;
-  --border-strong: #d9cbc5;
-  --border-focus: #cbb9b2;
+  /* Kenarlıklar (Toprak ve taş paletiyle uyumlu, zarif) */
+  --border-subtle: #a89997;
+  --border-strong: #918280;
+  --border-focus: #f9b88e;
 
-  /* Yüksek Kontrastlı Okunabilir Tipografi (WCAG AAA uyumlu derin füme mürekkep) */
-  --ink-primary: #241c1d;
-  --ink-secondary: #5c5254;
-  --ink-muted: #8c8082;
+  /* Yüksek Kontrastlı Okunabilir Tipografi (WCAG AAA uyumlu zengin espresso mürekkep) */
+  --ink-primary: #231c1a;
+  --ink-secondary: #4a3e3b;
+  --ink-muted: #6e5f5c;
 }
 
 @theme {
@@ -70,24 +70,24 @@ body {
 
 .surface-card:hover {
   border-color: var(--border-strong);
-  box-shadow: 0 2px 8px rgba(36, 28, 29, 0.04);
+  box-shadow: 0 2px 8px rgba(35, 28, 26, 0.08);
 }
 
 /* 10% Vurgu Butonları */
 .btn-accent {
   background-color: var(--c10);
   color: var(--ink-primary);
-  font-weight: 600;
-  border: 1px solid var(--border-subtle);
+  font-weight: 700;
+  border: 1px solid rgba(35, 28, 26, 0.15);
   border-radius: 0.5rem;
   transition: all 0.15s ease;
-  box-shadow: 0 1px 2px rgba(36, 28, 29, 0.04);
+  box-shadow: 0 1px 3px rgba(35, 28, 26, 0.08);
 }
 
 .btn-accent:hover {
-  background-color: #ffffff;
+  background-color: #f7a976;
   border-color: var(--border-strong);
-  box-shadow: 0 2px 6px rgba(36, 28, 29, 0.06);
+  box-shadow: 0 2px 6px rgba(35, 28, 26, 0.12);
 }
 
 /* Sade Durum Rozetleri */
@@ -98,8 +98,8 @@ body {
   padding: 0.2rem 0.6rem;
   border-radius: 9999px;
   font-size: 0.75rem;
-  font-weight: 600;
-  border: 1px solid var(--border-subtle);
+  font-weight: 700;
+  border: 1px solid rgba(35, 28, 26, 0.15);
   background-color: var(--c10);
   color: var(--ink-primary);
 }

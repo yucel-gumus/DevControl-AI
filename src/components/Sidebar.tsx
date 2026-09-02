@@ -67,25 +67,25 @@ export const Sidebar: React.FC<Props> = ({
   return (
     <aside
       id="app-sidebar"
-      className="w-64 bg-[#f9efec] border-r border-[#e8ded9] flex flex-col justify-between shrink-0 h-screen sticky top-0 font-sans select-none z-20 text-[#241c1d]"
+      className="w-64 bg-[#cdc1b5] border-r border-[#a89997] flex flex-col justify-between shrink-0 h-screen sticky top-0 font-sans select-none z-20 text-[#231c1a]"
     >
       {/* Marka Başlığı */}
       <div>
-        <div className="px-5 py-5 border-b border-[#e8ded9]">
+        <div className="px-5 py-5 border-b border-[#a89997]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#fff4f0] border border-[#e8ded9] flex items-center justify-center text-[#241c1d] font-bold text-xs shadow-xs">
+            <div className="w-8 h-8 rounded-lg bg-[#f9b88e] border border-[#231c1a]/15 flex items-center justify-center text-[#231c1a] font-bold text-xs shadow-xs">
               DC
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-sm text-[#241c1d] tracking-tight">
+                <span className="font-bold text-sm text-[#231c1a] tracking-tight">
                   DevControl
                 </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9]">
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
                   AI
                 </span>
               </div>
-              <span className="text-[11px] text-[#5c5254] font-normal">
+              <span className="text-[11px] text-[#4a3e3b] font-normal">
                 Mühendislik Zekası
               </span>
             </div>
@@ -104,16 +104,16 @@ export const Sidebar: React.FC<Props> = ({
                 onClick={() => onSelectTab(item.id)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs transition-all cursor-pointer text-left group relative ${
                   isActive
-                    ? 'bg-[#fff4f0] text-[#241c1d] font-bold border border-[#e8ded9] shadow-xs'
-                    : 'text-[#5c5254] hover:text-[#241c1d] hover:bg-[#fff4f0]/60 border border-transparent'
+                    ? 'bg-[#f9b88e] text-[#231c1a] font-bold border border-[#231c1a]/20 shadow-xs'
+                    : 'text-[#4a3e3b] hover:text-[#231c1a] hover:bg-[#b9aba9]/40 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Icon
                     className={`w-4 h-4 shrink-0 transition-colors ${
                       isActive
-                        ? 'text-[#241c1d]'
-                        : 'text-[#5c5254] group-hover:text-[#241c1d]'
+                        ? 'text-[#231c1a]'
+                        : 'text-[#4a3e3b] group-hover:text-[#231c1a]'
                     }`}
                   />
                   <span className="truncate">{item.label}</span>
@@ -121,10 +121,10 @@ export const Sidebar: React.FC<Props> = ({
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   {item.isAi && (
-                    <Sparkles className="w-3.5 h-3.5 text-[#241c1d]" />
+                    <Sparkles className="w-3.5 h-3.5 text-[#231c1a]" />
                   )}
                   {item.badge !== undefined && (
-                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9]">
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20">
                       {item.badge}
                     </span>
                   )}
@@ -136,20 +136,20 @@ export const Sidebar: React.FC<Props> = ({
       </div>
 
       {/* Kullanıcı & GitHub Durum Altlığı */}
-      <div className="p-3 border-t border-[#e8ded9] space-y-2">
+      <div className="p-3 border-t border-[#a89997] space-y-2">
         {/* Canlı GitHub Durumu */}
-        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] text-xs">
-          <div className="flex items-center gap-2 text-[#241c1d]">
-            <Github className="w-3.5 h-3.5 text-[#241c1d]" />
-            <span className="text-[11px] font-medium">GitHub</span>
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#b9aba9]/40 border border-[#a89997] text-xs">
+          <div className="flex items-center gap-2 text-[#231c1a]">
+            <Github className="w-3.5 h-3.5 text-[#231c1a]" />
+            <span className="text-[11px] font-bold">GitHub</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                authenticated ? 'bg-[#241c1d]' : 'bg-[#8c8082]'
+                authenticated ? 'bg-[#231c1a]' : 'bg-[#6e5f5c]'
               }`}
             />
-            <span className="text-[10px] font-semibold text-[#241c1d]">
+            <span className="text-[10px] font-bold text-[#231c1a]">
               {authenticated ? 'Bağlı' : 'Bekleniyor'}
             </span>
           </div>
@@ -161,31 +161,31 @@ export const Sidebar: React.FC<Props> = ({
           target="_blank"
           rel="author external"
           title="Geliştirici: Yücel Gümüş (yucelgumus.dev)"
-          className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border border-transparent hover:border-[#e8ded9] hover:bg-[#fff4f0] transition-all group"
+          className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-transparent hover:border-[#a89997] hover:bg-[#b9aba9]/40 transition-all group"
         >
           <div className="flex items-center gap-2.5 min-w-0">
             {user?.avatar_url ? (
               <img
                 src={user.avatar_url}
                 alt={user.name}
-                className="w-7 h-7 rounded-full border border-[#e8ded9] object-cover shrink-0"
+                className="w-7 h-7 rounded-full border border-[#a89997] object-cover shrink-0"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] flex items-center justify-center font-bold text-xs shrink-0">
+              <div className="w-7 h-7 rounded-full bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 flex items-center justify-center font-bold text-xs shrink-0">
                 U
               </div>
             )}
             <div className="flex flex-col min-w-0 text-left">
-              <span className="text-xs font-bold text-[#241c1d] truncate group-hover:underline">
+              <span className="text-xs font-bold text-[#231c1a] truncate group-hover:underline">
                 {user?.name || user?.login || 'Yücel Gümüş'}
               </span>
-              <span className="text-[10px] text-[#5c5254] truncate">
+              <span className="text-[10px] text-[#4a3e3b] truncate font-medium">
                 yucelgumus.dev
               </span>
             </div>
           </div>
-          <ExternalLink className="w-3 h-3 text-[#8c8082] group-hover:text-[#241c1d] shrink-0" />
+          <ExternalLink className="w-3 h-3 text-[#6e5f5c] group-hover:text-[#231c1a] shrink-0" />
         </a>
       </div>
     </aside>

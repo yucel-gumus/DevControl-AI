@@ -1,207 +1,266 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  Terminal,
   Send,
+  Terminal,
   Sparkles,
-  Cpu,
-  ChevronDown,
-  ChevronUp,
+  Bot,
+  User,
+  Wrench,
+  CheckCircle2,
+  AlertCircle,
+  Copy,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
-import { AskAiMessage, AnalysisTrace } from '../types.js';
+import { AskAiMessage } from '../types.js';
 
 interface Props {
   messages: AskAiMessage[];
-  onSendMessage: (query: string) => Promise<void>;
   isLoading: boolean;
-  activeTrace: AnalysisTrace | null;
-  defaultPrompt?: string;
+  onSendMessage: (text: string) => void;
+  onClearChat?: () => void;
+  rateLimitStatus?: any;
 }
 
 export const AskAiView: React.FC<Props> = ({
-  messages,
-  onSendMessage,
+  messages = [],
   isLoading,
-  activeTrace,
-  defaultPrompt,
+  onSendMessage,
+  onClearChat,
+  rateLimitStatus,
 }) => {
-  const [inputQuery, setInputQuery] = useState(defaultPrompt || '');
-  const [expandedTraces, setExpandedTraces] = useState<Record<string, boolean>>({});
+  const [input, setInput] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
-    if (defaultPrompt) {
-      setInputQuery(defaultPrompt);
-    }
-  }, [defaultPrompt]);
+    scrollToBottom();
+  }, [messages, isLoading]);
 
-  const sampleQuestions = [
-    'Son 30 günde projelerimde ne değişti?',
-    'En büyük mühendislik riskleri nerede ve nasıl çözerim?',
-    'Hangi dosyalar bakım sıcak noktasına (hotspot) dönüşüyor?',
-    'DevControl genel sağlık skoru dağılımımız nedir?',
-    'Kanıtlara dayalı mimari ve teknik başarılarımı özetle.',
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    onSendMessage(input.trim());
+    setInput('');
+  };
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const defaultPrompts = [
+    'En yüksek hata oranına sahip 3 kritik dosyamı ve nedenlerini analiz et.',
+    'Son 14 günlük commit tempomu ve kod oynaklığı trendlerimi açıkla.',
+    'En çok kod dalgalanması olan depom için 3 somut mimari iyileştirme öner.',
   ];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputQuery.trim() || isLoading) return;
-    const q = inputQuery;
-    setInputQuery('');
-    await onSendMessage(q);
-  };
-
-  const toggleTrace = (id: string) => {
-    setExpandedTraces((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
   return (
-    <div id="ask-ai-view" className="space-y-6 max-w-4xl mx-auto font-sans text-[#241c1d]">
-      {/* Header Banner */}
-      <div className="p-5 rounded-xl border border-[#e8ded9] bg-[#f9efec] space-y-3.5 shadow-xs">
+    <div id="ask-ai-view" className="flex flex-col h-[calc(100vh-8.5rem)] font-sans text-[#231c1a]">
+      {/* Üst Bilgi Barı */}
+      <div className="p-4 rounded-xl border border-[#a89997] bg-[#cdc1b5] mb-4 flex items-center justify-between gap-4 shadow-xs shrink-0">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d] shadow-xs">
-            <Terminal className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-[#f9b88e] border border-[#231c1a]/15 flex items-center justify-center text-[#231c1a] shadow-xs">
+            <Sparkles className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9]">
-                Otonom Sorgu Planlayıcı
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#fff4f0] text-[#5c5254] border border-[#e8ded9]">
-                Kanıta Dayalı
+              <h2 className="text-xs font-bold text-[#231c1a] tracking-tight">
+                DevControl Yapay Zeka Analisti
+              </h2>
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                Gemini Flash
               </span>
             </div>
-            <h2 className="text-base font-bold text-[#241c1d] mt-1 tracking-tight">
-              Mühendislik Verilerinize Sorun
-            </h2>
+            <p className="text-[11px] text-[#4a3e3b] font-medium">
+              Kişisel GitHub verilerinize bağlı, deterministik metrik sorgulama ajanınız.
+            </p>
           </div>
         </div>
-        <p className="text-xs text-[#5c5254] leading-relaxed">
-          Kod tabanınız, commit dalgalanmaları veya PR darboğazları hakkında soru sorun. Yapay zeka analisti telemetri verilerini tarar ve kanıtlanabilir yanıtlar üretir.
-        </p>
 
-        {/* Quick Sample Prompts */}
-        <div className="pt-1 flex flex-wrap gap-1.5">
-          {sampleQuestions.map((q, idx) => (
-            <button
-              key={idx}
-              onClick={() => setInputQuery(q)}
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-md border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-colors cursor-pointer shadow-xs"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
+        {onClearChat && messages.length > 0 && (
+          <button
+            onClick={onClearChat}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer shadow-xs"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Sohbeti Temizle</span>
+          </button>
+        )}
       </div>
 
-      {/* Chat Messages Container */}
-      <div className="space-y-4 min-h-[260px]">
-        {messages.length === 0 && (
-          <div className="p-8 rounded-xl border border-[#e8ded9] bg-[#f9efec] text-center text-xs text-[#8c8082]">
-            Henüz soru sorulmadı. Yukarıdaki önerilen sorulardan birine tıklayabilir veya aklınızdaki soruyu yazabilirsiniz.
-          </div>
-        )}
+      {/* Mesaj Akışı Alanı */}
+      <div className="flex-1 overflow-y-auto p-4 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-4 shadow-xs">
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#f9b88e] border border-[#231c1a]/15 flex items-center justify-center text-[#231c1a] shadow-xs">
+              <Terminal className="w-6 h-6" />
+            </div>
+            <div className="max-w-md space-y-1">
+              <h3 className="text-sm font-bold text-[#231c1a]">
+                Kod Tabanınız Hakkında Soru Sorun
+              </h3>
+              <p className="text-xs text-[#4a3e3b] font-medium">
+                Ajan; depolarınızı, sıcak noktaları, hata oranlarını ve PR durumlarını analiz ederek somut yanıtlar üretir.
+              </p>
+            </div>
 
-        {messages.map((msg) => {
-          const isUser = msg.role === 'user' || (msg as any).sender === 'user';
-          return (
-            <div
-              key={msg.id}
-              className={`p-4 rounded-xl border border-[#e8ded9] transition-all shadow-xs space-y-2.5 ${
-                isUser
-                  ? 'ml-8 bg-[#fff4f0] text-[#241c1d]'
-                  : 'mr-8 bg-[#f9efec] text-[#241c1d]'
-              }`}
-            >
-              {/* Message Header */}
-              <div className="flex items-center justify-between border-b border-[#e8ded9] pb-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded border border-[#e8ded9] ${
-                      isUser
-                        ? 'bg-[#f6f3f4] text-[#241c1d]'
-                        : 'bg-[#fff4f0] text-[#241c1d]'
-                    }`}
-                  >
-                    {isUser ? 'Siz' : 'Mühendislik Analisti'}
-                  </span>
-                  <span className="text-[10px] text-[#8c8082]">
-                    {Number.isNaN(new Date(msg.timestamp).getTime())
-                      ? msg.timestamp
-                      : new Date(msg.timestamp).toLocaleTimeString('tr-TR')}
-                  </span>
+            {/* Hızlı Başlangıç İpuçları */}
+            <div className="w-full max-w-lg space-y-2 pt-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a3e3b] block text-left">
+                Örnek Mühendislik Soruları
+              </span>
+              {defaultPrompts.map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onSendMessage(prompt)}
+                  className="w-full text-left p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 hover:bg-[#b9aba9]/50 transition-all text-xs font-bold text-[#231c1a] cursor-pointer shadow-xs"
+                >
+                  "{prompt}"
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isUser = msg.role === 'user';
+            return (
+              <div
+                key={msg.id}
+                className={`flex gap-3 text-xs ${
+                  isUser ? 'justify-end' : 'justify-start'
+                }`}
+              >
+                {!isUser && (
+                  <div className="w-7 h-7 rounded-lg bg-[#f9b88e] border border-[#231c1a]/15 flex items-center justify-center shrink-0 text-[#231c1a] shadow-xs mt-0.5">
+                    <Bot className="w-3.5 h-3.5" />
+                  </div>
+                )}
+
+                <div
+                  className={`max-w-[85%] rounded-xl p-3.5 space-y-2 shadow-xs ${
+                    isUser
+                      ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 font-medium'
+                      : 'bg-[#b9aba9]/35 border border-[#a89997] text-[#231c1a]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-4 border-b border-[#231c1a]/10 pb-1.5">
+                    <span className="font-bold text-[11px] text-[#231c1a]">
+                      {isUser ? 'Siz' : 'Gemini Analisti'}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-[#4a3e3b]">
+                        {new Date(msg.timestamp).toLocaleTimeString('tr-TR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                      {!isUser && (
+                        <button
+                          onClick={() => handleCopy(msg.content, msg.id)}
+                          className="text-[#4a3e3b] hover:text-[#231c1a] transition-colors p-0.5"
+                          title="Yanıtı kopyala"
+                        >
+                          {copiedId === msg.id ? (
+                            <Check className="w-3 h-3 text-[#231c1a]" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mesaj İçeriği */}
+                  <div className="leading-relaxed whitespace-pre-wrap font-sans break-words font-medium">
+                    {msg.content}
+                  </div>
+
+                  {/* Arka Planda Çalıştırılan Araçlar (Tool Invocations) */}
+                  {msg.toolInvocations && msg.toolInvocations.length > 0 && (
+                    <div className="pt-2 border-t border-[#a89997] space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a3e3b] flex items-center gap-1">
+                        <Wrench className="w-3 h-3 text-[#231c1a]" />
+                        <span>Sorgulanan GitHub Telemetri Araçları</span>
+                      </span>
+                      <div className="space-y-1">
+                        {msg.toolInvocations.map((tool, tIdx) => (
+                          <div
+                            key={tIdx}
+                            className="p-2 rounded bg-[#cdc1b5] border border-[#a89997] text-[11px] flex items-center justify-between gap-2"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3 h-3 text-[#231c1a]" />
+                              <span className="font-mono font-bold text-[#231c1a]">
+                                {tool.toolName}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-[#4a3e3b] font-bold">
+                              Tamamlandı
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {!isUser && msg.trace && (
-                  <button
-                    onClick={() => toggleTrace(msg.id)}
-                    className="flex items-center gap-1 text-[11px] font-bold text-[#5c5254] hover:text-[#241c1d] transition-colors cursor-pointer"
-                  >
-                    <Cpu className="w-3.5 h-3.5 text-[#241c1d]" />
-                    <span>Plan ({msg.trace.steps.length} adım)</span>
-                    {expandedTraces[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  </button>
+                {isUser && (
+                  <div className="w-7 h-7 rounded-lg bg-[#b9aba9] border border-[#a89997] flex items-center justify-center shrink-0 text-[#231c1a] shadow-xs mt-0.5">
+                    <User className="w-3.5 h-3.5" />
+                  </div>
                 )}
               </div>
+            );
+          })
+        )}
 
-              {/* Execution Trace (Collapsible) */}
-              {!isUser && msg.trace && expandedTraces[msg.id] && (
-                <div className="p-3 rounded-lg border border-[#e8ded9] bg-[#f6f3f4] space-y-2 text-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#5c5254] block">
-                    Yürütme Adımları:
-                  </span>
-                  {msg.trace.steps.map((st, sIdx) => (
-                    <div key={sIdx} className="space-y-0.5">
-                      <div className="font-bold flex items-center gap-1.5 text-[#241c1d]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#241c1d] shrink-0" />
-                        <span>{sIdx + 1}. {(st as any).action || st.step}</span>
-                      </div>
-                      <p className="text-[11px] pl-3 text-[#5c5254]">{st.details}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Message Content */}
-              <div className="text-xs leading-relaxed whitespace-pre-wrap">
-                {msg.content}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Live Loading Skeleton */}
+        {/* Yükleniyor Göstergesi */}
         {isLoading && (
-          <div className="p-4 rounded-xl border border-[#e8ded9] bg-[#f9efec] animate-pulse space-y-2 mr-8 shadow-xs">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 animate-spin text-[#241c1d]" />
-              <span className="text-xs font-semibold text-[#241c1d]">
-                {(activeTrace?.steps.slice(-1)[0] as any)?.action || activeTrace?.steps.slice(-1)[0]?.details || 'Telemetri verileri taranıyor ve analiz ediliyor...'}
+          <div className="flex gap-3 text-xs justify-start items-center">
+            <div className="w-7 h-7 rounded-lg bg-[#f9b88e] border border-[#231c1a]/15 flex items-center justify-center shrink-0 text-[#231c1a] shadow-xs">
+              <Bot className="w-3.5 h-3.5" />
+            </div>
+            <div className="p-3 rounded-xl border border-[#a89997] bg-[#b9aba9]/35 text-[#231c1a] flex items-center gap-2 shadow-xs">
+              <div className="w-2 h-2 rounded-full bg-[#f9b88e] animate-ping" />
+              <span className="font-bold text-[11px]">
+                Telemetri verileri analiz ediliyor ve yanıt oluşturuluyor...
               </span>
             </div>
           </div>
         )}
+
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Query Input Box (Sticky Bottom) */}
-      <form onSubmit={handleSubmit} className="sticky bottom-4">
-        <div className="p-1.5 rounded-xl border border-[#e8ded9] bg-[#f9efec]/95 backdrop-blur-md flex items-center gap-2 shadow-lg">
-          <input
-            type="text"
-            value={inputQuery}
-            onChange={(e) => setInputQuery(e.target.value)}
-            placeholder="Bir mühendislik sorusu yazın..."
-            disabled={isLoading}
-            className="flex-1 px-3.5 py-2 text-xs bg-[#fff4f0] border border-[#e8ded9] rounded-lg text-[#241c1d] placeholder-[#8c8082] focus:outline-hidden focus:border-[#d9cbc5]"
-          />
-          <button
-            type="submit"
-            disabled={!inputQuery.trim() || isLoading}
-            className="px-4 py-2 rounded-lg text-xs font-bold bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-colors flex items-center gap-1.5 cursor-pointer border border-[#e8ded9] shadow-xs disabled:opacity-40 disabled:pointer-events-none"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Gönder</span>
-          </button>
-        </div>
+      {/* Mesaj Yazma Giriş Çubuğu */}
+      <form
+        onSubmit={handleSubmit}
+        className="mt-3 flex items-center gap-2 p-1.5 rounded-xl border border-[#a89997] bg-[#cdc1b5] shadow-xs shrink-0"
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Mühendislik veya depo analizi hakkında soru sorun..."
+          disabled={isLoading}
+          className="flex-1 bg-transparent px-3 py-2 text-xs text-[#231c1a] placeholder-[#6e5f5c] focus:outline-none disabled:opacity-50 font-medium"
+        />
+        <button
+          type="submit"
+          disabled={!input.trim() || isLoading}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] hover:brightness-105 transition-all cursor-pointer disabled:opacity-40 border border-[#231c1a]/20 shadow-xs"
+        >
+          <span>Gönder</span>
+          <Send className="w-3 h-3 text-[#231c1a]" />
+        </button>
       </form>
     </div>
   );

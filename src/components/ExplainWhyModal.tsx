@@ -1,16 +1,13 @@
 import React from 'react';
-import { X, Database, HelpCircle, Cpu } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { X, HelpCircle, AlertTriangle, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export interface ExplainWhyData {
   title: string;
-  category?: string;
-  severity?: string;
-  confidence?: number;
-  impactScore?: number;
+  category: string;
   summary: string;
-  facts?: string[];
-  evidence?: any;
+  impactScore?: number;
+  confidence?: number;
+  evidence?: string[];
   actionPlan?: string[];
   recommendedAction?: string;
 }
@@ -21,147 +18,122 @@ interface Props {
   data: ExplainWhyData | null;
 }
 
-export const ExplainWhyModal: React.FC<Props> = ({ isOpen, onClose, data }) => {
+export const ExplainWhyModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  data,
+}) => {
   if (!isOpen || !data) return null;
 
-  const evidenceList = Array.isArray(data.evidence)
-    ? data.evidence
-    : data.facts || [];
-
-  const actionsList = data.actionPlan || (data.recommendedAction ? [data.recommendedAction] : []);
-
   return (
-    <AnimatePresence>
-      <div
-        id="modal-explain-why-backdrop"
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm font-sans"
-      >
-        <motion.div
-          id="modal-explain-why-container"
-          initial={{ opacity: 0, scale: 0.96, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 8 }}
-          transition={{ duration: 0.15 }}
-          className="relative w-full max-w-xl rounded-2xl border border-[#e8ded9] bg-[#f9efec] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] text-[#241c1d]"
-        >
-          {/* Modal Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#e8ded9]">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d] shadow-xs">
-                <HelpCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#fff4f0] border border-[#e8ded9] text-[#5c5254]">
-                    Kanıt Doğrulama
-                  </span>
-                  {data.category && (
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-[#fff4f0] border border-[#e8ded9] text-[#241c1d]">
-                      {data.category}
-                    </span>
-                  )}
-                </div>
-                <h3 className="text-sm font-bold text-[#241c1d] mt-0.5">
-                  {data.title}
-                </h3>
-              </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto font-sans"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="explain-modal-title"
+    >
+      <div className="w-full max-w-xl p-6 rounded-2xl border border-[#a89997] bg-[#cdc1b5] space-y-5 shadow-2xl animate-in zoom-in-95 my-8 text-[#231c1a]">
+        {/* Üst Başlık & Kapatma Butonu */}
+        <div className="flex items-start justify-between gap-4 border-b border-[#a89997] pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#f9b88e] border border-[#231c1a]/15 text-[#231c1a] shadow-xs shrink-0">
+              <HelpCircle className="w-5 h-5" />
             </div>
-            <button
-              id="btn-close-explain-modal"
-              onClick={onClose}
-              className="p-1.5 rounded-lg border border-[#e8ded9] bg-[#fff4f0] text-[#241c1d] hover:bg-white cursor-pointer transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Modal Scrollable Body */}
-          <div className="p-5 overflow-y-auto space-y-4 text-xs">
-            {/* Core Principle Badge */}
-            <div className="p-3 rounded-lg border border-[#e8ded9] bg-[#fff4f0] flex items-start gap-2.5 text-[#5c5254] shadow-xs">
-              <Cpu className="w-4 h-4 text-[#241c1d] mt-0.5 shrink-0" />
-              <div className="leading-relaxed">
-                <strong className="text-[#241c1d]">Kanıta Dayalı Doğrulama:</strong> Bu tespit deterministik metrik motorları ve Gemini analisti tarafından doğrulanmış telemetriye dayanır.
-              </div>
-            </div>
-
-            {/* Summary */}
-            <div className="p-3.5 rounded-lg border border-[#e8ded9] bg-[#fff4f0] space-y-1 shadow-xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5c5254] block">
-                Özet Bulgular
-              </span>
-              <p className="text-xs leading-relaxed text-[#241c1d]">
-                {data.summary}
-              </p>
-            </div>
-
-            {/* Measured Evidence List */}
-            <div className="space-y-2">
+            <div>
               <div className="flex items-center gap-2">
-                <Database className="w-3.5 h-3.5 text-[#241c1d]" />
-                <h4 className="text-xs font-bold text-[#241c1d] uppercase tracking-wider">
-                  Doğrulanmış Kanıtlar
-                </h4>
-              </div>
-
-              <div className="space-y-1.5">
-                {evidenceList.map((item: any, idx: number) => {
-                  const isObj = typeof item === 'object' && item !== null;
-                  return (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-lg border border-[#e8ded9] bg-[#fff4f0] flex items-start justify-between gap-3 shadow-xs"
-                    >
-                      <div className="space-y-0.5 min-w-0">
-                        <span className="text-xs font-bold text-[#241c1d] block">
-                          {isObj ? item.metric || item.name : item}
-                        </span>
-                        {isObj && item.description && (
-                          <p className="text-[11px] text-[#5c5254]">
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
-                      {isObj && item.value !== undefined && (
-                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#f6f3f4] border border-[#e8ded9] text-[#241c1d] shrink-0">
-                          {item.value}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Action Plan */}
-            {actionsList.length > 0 && (
-              <div className="p-3.5 rounded-lg border border-[#e8ded9] bg-[#fff4f0] space-y-2 shadow-xs">
-                <span className="text-xs font-bold text-[#241c1d] block">
-                  Önerilen Çözüm ve Aksiyonlar
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                  {data.category}
                 </span>
-                <ul className="space-y-1.5 text-xs text-[#5c5254]">
-                  {actionsList.map((act, aIdx) => (
-                    <li key={aIdx} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#241c1d] mt-1.5 shrink-0" />
-                      <span>{act}</span>
-                    </li>
-                  ))}
-                </ul>
+                {data.confidence && (
+                  <span className="text-[11px] text-[#4a3e3b] font-medium">
+                    Güven: %{Math.round(data.confidence * 100)}
+                  </span>
+                )}
               </div>
-            )}
+              <h3 id="explain-modal-title" className="text-sm font-bold text-[#231c1a] mt-1">
+                {data.title}
+              </h3>
+            </div>
           </div>
 
-          {/* Modal Footer */}
-          <div className="px-5 py-3 border-t border-[#e8ded9] flex justify-end bg-[#f9efec]">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-xs font-bold bg-[#fff4f0] text-[#241c1d] hover:bg-white transition-colors cursor-pointer border border-[#e8ded9] shadow-xs"
-            >
-              Anladım ve Kapat
-            </button>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-[#231c1a] hover:brightness-105 cursor-pointer transition-all shrink-0"
+            aria-label="Kapat"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Özet Açıklama */}
+        <div className="p-4 rounded-xl border border-[#a89997] bg-[#b9aba9]/35 space-y-1.5 shadow-xs">
+          <span className="text-[10px] font-bold uppercase text-[#4a3e3b]">
+            Durum Özeti
+          </span>
+          <p className="text-xs text-[#231c1a] font-medium leading-relaxed">
+            {data.summary}
+          </p>
+        </div>
+
+        {/* Kanıtlar (Evidence) */}
+        {data.evidence && data.evidence.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#231c1a] flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#231c1a]" />
+              <span>Gözlemlenen Telemetri Kanıtları</span>
+            </h4>
+            <ul className="space-y-1.5">
+              {data.evidence.map((ev, idx) => (
+                <li
+                  key={idx}
+                  className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-xs text-[#4a3e3b] flex items-start gap-2 font-medium"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
+                  <span>{ev}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        </motion.div>
+        )}
+
+        {/* Aksiyon Planı (Action Plan) */}
+        {(data.actionPlan && data.actionPlan.length > 0) || data.recommendedAction ? (
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#231c1a] flex items-center gap-1.5">
+              <ArrowRight className="w-3.5 h-3.5 text-[#231c1a]" />
+              <span>Önerilen Mühendislik Aksiyonları</span>
+            </h4>
+            <div className="space-y-1.5">
+              {data.recommendedAction && (
+                <div className="p-3 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-xs font-bold text-[#231c1a] shadow-xs">
+                  {data.recommendedAction}
+                </div>
+              )}
+              {data.actionPlan?.map((act, idx) => (
+                <div
+                  key={idx}
+                  className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-xs text-[#4a3e3b] flex items-start gap-2.5 font-medium"
+                >
+                  <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                    {idx + 1}
+                  </span>
+                  <span>{act}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Alt Butonlar */}
+        <div className="pt-3 border-t border-[#a89997] flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] hover:brightness-105 transition-all cursor-pointer border border-[#231c1a]/20 shadow-xs"
+          >
+            Anladım, Kapat
+          </button>
+        </div>
       </div>
-    </AnimatePresence>
+    </div>
   );
 };
