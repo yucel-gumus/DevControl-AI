@@ -1,6 +1,27 @@
 # 🚀 DevControl AI - Mühendislik Zekası ve Kişisel GitHub Analiz Platformu
 
+[![Canlı Uygulama](https://img.shields.io/badge/Canl%C4%B1%20Uygulama-devcontrol--ai.web.app-brightgreen?style=for-the-badge&logo=firebase)](https://devcontrol-ai.web.app)
+[![Geliştirici](https://img.shields.io/badge/Geli%C5%9Ftirici-Y%C3%BCcel%20G%C3%BCm%C3%BC%C5%9F-blue?style=for-the-badge&logo=googlechrome)](https://yucelgumus.dev/)
+[![GitHub](https://img.shields.io/badge/GitHub-@yucel--gumus-181717?style=for-the-badge&logo=github)](https://github.com/yucel-gumus)
+
 **DevControl AI**, kişisel GitHub depolarınızı ve geliştirici telemetrinizi derinlemesine analiz eden, deterministik mühendislik sağlık skorları hesaplayan ve Google Gemini yapay zeka modelleriyle zenginleştirilmiş aksiyon planları sunan yeni nesil bir mühendislik zekası platformudur.
+
+---
+
+## 🌐 Canlı Uygulama Bağlantıları
+
+- 🌟 **Canlı Web Uygulaması:** [https://devcontrol-ai.web.app](https://devcontrol-ai.web.app)
+- 🔗 **Alternatif Canlı URL:** [https://devcontrol-ai.firebaseapp.com](https://devcontrol-ai.firebaseapp.com)
+
+---
+
+## 👨‍💻 Geliştirici Bilgileri (Author & Developer)
+
+Bu proje **[Yücel Gümüş](https://yucelgumus.dev/)** tarafından sıfırdan tasarlanmış, geliştirilmiş ve canlıya alınmıştır.
+
+- 🌐 **Kişisel Web Sitesi:** [https://yucelgumus.dev/](https://yucelgumus.dev/)
+- 🐙 **GitHub Profili:** [@yucel-gumus](https://github.com/yucel-gumus)
+- 💼 **Uzmanlık:** Yazılım Geliştirme, Yapay Zeka Ajanları (Agentic AI), Bulut Mimarileri ve Veri Sistemleri
 
 ---
 
@@ -28,10 +49,20 @@
 
 ---
 
+## 🎨 Tasarım Mimarisi (60-30-10 Kuralı)
+Arayüz, modern geliştirici araçları estetiği ve UI/UX standartları gözetilerek **yalnızca 3 renk** ile 60-30-10 kuralına göre tasarlanmıştır:
+- **%60 DOMINANT (`#f6f3f4`):** Ferah, gözü yormayan ana tuval ve sayfa zemini.
+- **%30 SECONDARY (`#f9efec`):** Bento grid kartları, yan menü, üst bar ve yapısal paneller.
+- **%10 ACCENT (`#fff4f0`):** Etkileşimli butonlar, aktif sekme göstergeleri ve durum rozetleri.
+- **Tipografi:** WCAG AAA kontrastlı derin füme mürekkep (`#241c1d`).
+
+---
+
 ## 🛠️ Teknoloji Yığını
 
 - **Frontend**: React 19, TypeScript, TailwindCSS, Recharts, Lucide React, Motion, TanStack React Query
 - **Backend**: Node.js, Express, Google GenAI SDK (`@google/genai`), express-rate-limit
+- **Bulut & Dağıtım**: Google Cloud Run, Google Cloud Secret Manager, Firebase Hosting, Docker (Multi-stage Alpine)
 - **Araçlar & Derleme**: Vite 6, esbuild, tsx watch
 
 ---
@@ -46,7 +77,7 @@
 ### 2. Kurulum
 Depoyu klonlayın ve bağımlılıkları yükleyin:
 ```bash
-git clone <repo-url>
+git clone https://github.com/yucel-gumus/DevControl-AI.git
 cd DevControl-AI
 npm install
 ```
@@ -66,7 +97,7 @@ GEMINI_API_KEY="AIzaSy..."
 GITHUB_TOKEN="ghp_..."
 ```
 
-> **Önemli Güvenlik Notu**: `.env` dosyası `.gitignore` ile korunmaktadır. API anahtarlarınız ve GitHub tokenınız asla istemciye veya git reposuna sızdırılmaz.
+> **Önemli Güvenlik Notu**: `.env` dosyası `.gitignore` ve `.dockerignore` ile korunmaktadır. API anahtarlarınız ve GitHub tokenınız asla istemciye veya git reposuna sızdırılmaz.
 
 ### 4. Uygulamayı Çalıştırma
 Geliştirme sunucusunu başlatın:
@@ -90,10 +121,10 @@ Uygulama otomatik olarak `http://localhost:3000` adresinde açılacaktır.
 
 ## 🔒 Gizlilik ve Güvenlik
 - Sistemde **hiçbir sahte (mock / dummy)** veri bulunmaz.
-- Arayüzden token değiştirme devre dışıdır; sunucu tamamen yerel `.env` dosyanız üzerinden çalışır.
-- GitHub verileriniz üçüncü şahıs sunuculara iletilmez, yalnızca yerel oturumunuzda analiz edilir.
+- Arayüzden token değiştirme devre dışıdır; sunucu tamamen yerel `.env` veya Google Cloud Secret Manager üzerinden çalışır.
+- GitHub verileriniz üçüncü şahıs sunuculara iletilmez, yalnızca kendi oturumunuzda analiz edilir.
 
 ---
 
 ## 📄 Lisans
-Bu proje MIT lisansı altında lisanslanmıştır.
+Bu proje MIT lisansı altında lisanslanmıştır. Geliştirici: **[Yücel Gümüş](https://yucelgumus.dev/)**.

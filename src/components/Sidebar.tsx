@@ -6,6 +6,7 @@ import {
   FolderGit2,
   Github,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import { GitHubUser } from '../types.js';
 
@@ -154,29 +155,38 @@ export const Sidebar: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Kullanıcı Kartı */}
-        <div className="flex items-center gap-2.5 px-2 py-1.5">
-          {user?.avatar_url ? (
-            <img
-              src={user.avatar_url}
-              alt={user.name}
-              className="w-7 h-7 rounded-full border border-[#e8ded9] object-cover shrink-0"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-7 h-7 rounded-full bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] flex items-center justify-center font-bold text-xs shrink-0">
-              U
+        {/* Geliştirici Kartı & Web Sitesi Bağlantısı */}
+        <a
+          href="https://yucelgumus.dev/"
+          target="_blank"
+          rel="author external"
+          title="Geliştirici: Yücel Gümüş (yucelgumus.dev)"
+          className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border border-transparent hover:border-[#e8ded9] hover:bg-[#fff4f0] transition-all group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.name}
+                className="w-7 h-7 rounded-full border border-[#e8ded9] object-cover shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-[#fff4f0] text-[#241c1d] border border-[#e8ded9] flex items-center justify-center font-bold text-xs shrink-0">
+                U
+              </div>
+            )}
+            <div className="flex flex-col min-w-0 text-left">
+              <span className="text-xs font-bold text-[#241c1d] truncate group-hover:underline">
+                {user?.name || user?.login || 'Yücel Gümüş'}
+              </span>
+              <span className="text-[10px] text-[#5c5254] truncate">
+                yucelgumus.dev
+              </span>
             </div>
-          )}
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-semibold text-[#241c1d] truncate">
-              {user?.name || user?.login || 'GitHub Kullanıcısı'}
-            </span>
-            <span className="text-[11px] text-[#5c5254] truncate">
-              {user ? `@${user.login}` : 'Hesap bağlı değil'}
-            </span>
           </div>
-        </div>
+          <ExternalLink className="w-3 h-3 text-[#8c8082] group-hover:text-[#241c1d] shrink-0" />
+        </a>
       </div>
     </aside>
   );

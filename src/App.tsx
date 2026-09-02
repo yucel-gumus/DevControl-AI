@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sidebar, ActiveTab } from './components/Sidebar.js';
 import { Header } from './components/Header.js';
@@ -269,6 +270,28 @@ export default function App() {
                 rateLimitStatus={rateLimitStatus}
               />
             )}
+
+            {/* Alt Bilgi (Footer) - Geliştirici & Referans Bağlantısı */}
+            <footer className="pt-6 pb-4 mt-6 border-t border-[#e8ded9] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#5c5254]">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[#241c1d]">DevControl AI</span>
+                <span className="text-[#8c8082]">·</span>
+                <span>Mühendislik Zekası ve Kişisel GitHub Telemetri Platformu</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>Geliştirici:</span>
+                <a
+                  href="https://yucelgumus.dev/"
+                  target="_blank"
+                  rel="author external"
+                  title="Yücel Gümüş Kişisel Web Sitesi"
+                  className="font-bold text-[#241c1d] hover:underline inline-flex items-center gap-1.5 bg-[#fff4f0] px-2.5 py-1 rounded-lg border border-[#e8ded9] shadow-xs transition-colors hover:bg-white"
+                >
+                  <span>Yücel Gümüş</span>
+                  <ExternalLink className="w-3 h-3 text-[#241c1d]" />
+                </a>
+              </div>
+            </footer>
           </div>
         </main>
       </div>
