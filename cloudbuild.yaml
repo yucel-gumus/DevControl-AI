@@ -1,0 +1,41 @@
+steps:
+  # 1. Docker Build
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--no-cache'
+      - '-t'
+      - 'europe-west3-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/devcontrol-ai:$COMMIT_SHA'
+      - '.'
+      - '-f'
+      - 'Dockerfile'
+    id: Build
+
+  # 2. Docker Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west3-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/devcontrol-ai:$COMMIT_SHA'
+    id: Push
+
+  # 3. Deploy update to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'services'
+      - 'update'
+      - 'devcontrol-ai'
+      - '--platform=managed'
+      - '--image=europe-west3-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/devcontrol-ai:$COMMIT_SHA'
+      - '--region=europe-west3'
+      - '--labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA'
+      - '--quiet'
+    id: Deploy
+
+images:
+  - 'europe-west3-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/devcontrol-ai:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  substitutionOption: ALLOW_LOOSE
