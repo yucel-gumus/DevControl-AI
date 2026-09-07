@@ -8,12 +8,12 @@ const reposRouter = Router();
 // ------------------------------------------
 // AUTH ROUTES (/api/auth)
 // ------------------------------------------
-authRouter.get('/status', asyncHandler(async (req: any, res) => {
-  let state = GitHubService.getState(req.sessionId);
+authRouter.get('/status', asyncHandler(async (_req, res) => {
+  let state = GitHubService.getState();
   try {
-    state = await GitHubService.ensureSynced(req.sessionId);
+    state = await GitHubService.ensureSynced();
   } catch {
-    state = GitHubService.getState(req.sessionId);
+    state = GitHubService.getState();
   }
   res.json({
     authenticated: Boolean(state.token),
@@ -35,8 +35,8 @@ authRouter.post('/token', (_req, res) => {
 // ------------------------------------------
 // REPOS ROUTES (/api/repos)
 // ------------------------------------------
-reposRouter.get('/', asyncHandler(async (req: any, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext(req.sessionId);
+reposRouter.get('/', asyncHandler(async (_req, res) => {
+  const ctx = await GitHubService.getActiveTelemetryContext();
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
@@ -68,18 +68,18 @@ reposRouter.get('/', asyncHandler(async (req: any, res) => {
   });
 }));
 
-reposRouter.post('/toggle', asyncHandler(async (req: any, res) => {
+reposRouter.post('/toggle', asyncHandler(async (req, res) => {
   const { repoId } = req.body;
   if (!repoId || typeof repoId !== 'string') {
     return res.status(400).json({ error: 'repoId alanı zorunludur.' });
   }
-  const repos = await GitHubService.toggleRepoSelection(req.sessionId, repoId);
+  const repos = await GitHubService.toggleRepoSelection(repoId);
   res.json({ success: true, repositories: repos });
 }));
 
-reposRouter.post('/sync', asyncHandler(async (req: any, res) => {
+reposRouter.post('/sync', asyncHandler(async (_req, res) => {
   try {
-    const state = await GitHubService.syncRepositories(req.sessionId);
+    const state = await GitHubService.syncRepositories();
     if (state.syncStatus === 'no_data') {
       return res.status(409).json({ error: 'Eşitleme için önce bir GitHub hesabı bağlayın.' });
     }

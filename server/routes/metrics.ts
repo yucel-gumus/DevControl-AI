@@ -5,37 +5,37 @@ import { asyncHandler } from './asyncHandler.js';
 
 const router = Router();
 
-router.get('/health', asyncHandler(async (req: any, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext(req.sessionId);
+router.get('/health', asyncHandler(async (_req, res) => {
+  const ctx = await GitHubService.getActiveTelemetryContext();
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
   res.json({ ...ctx.health, syncStatus: ctx.state.syncStatus, telemetryStatus: ctx.state.telemetryStatus });
 }));
 
-router.get('/hotspots', asyncHandler(async (req: any, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext(req.sessionId);
+router.get('/hotspots', asyncHandler(async (_req, res) => {
+  const ctx = await GitHubService.getActiveTelemetryContext();
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
   res.json(ctx.hotspots);
 }));
 
-router.get('/risks', asyncHandler(async (req: any, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext(req.sessionId);
+router.get('/risks', asyncHandler(async (_req, res) => {
+  const ctx = await GitHubService.getActiveTelemetryContext();
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
   res.json(ctx.risks);
 }));
 
-router.get('/activity', asyncHandler(async (req: any, res) => {
+router.get('/activity', asyncHandler(async (req, res) => {
   const requestedDays = Number.parseInt(String(req.query.days || '30'), 10);
   const days = Number.isFinite(requestedDays)
     ? Math.min(TELEMETRY_WINDOW_DAYS, Math.max(1, requestedDays))
     : TELEMETRY_WINDOW_DAYS;
 
-  const ctx = await GitHubService.getActiveTelemetryContext(req.sessionId);
+  const ctx = await GitHubService.getActiveTelemetryContext();
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }

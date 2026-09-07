@@ -13,13 +13,12 @@ router.get('/status', (_req, res) => {
   res.json({
     configured: hasKey,
     model: GEMINI_MODEL_CHAIN[0],
-    fallbackAvailable: true,
     service: 'Google GenAI SDK (Çoklu Model Zinciri)',
   });
 });
 
-router.get('/brief', asyncHandler(async (req: any, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext(req.sessionId);
+router.get('/brief', asyncHandler(async (_req, res) => {
+  const ctx = await GitHubService.getActiveTelemetryContext();
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
@@ -27,8 +26,8 @@ router.get('/brief', asyncHandler(async (req: any, res) => {
   res.json(brief);
 }));
 
-router.get('/insights', asyncHandler(async (req: any, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext(req.sessionId);
+router.get('/insights', asyncHandler(async (_req, res) => {
+  const ctx = await GitHubService.getActiveTelemetryContext();
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
@@ -36,14 +35,14 @@ router.get('/insights', asyncHandler(async (req: any, res) => {
   res.json(insights);
 }));
 
-router.post('/ask', asyncHandler(async (req: any, res) => {
+router.post('/ask', asyncHandler(async (req, res) => {
   const body = req.body || {};
   const question = body.question || body.query;
   if (typeof question !== 'string' || !question.trim()) {
     return res.status(400).json({ error: 'İstek gövdesinde soru veya sorgu parametresi zorunludur.' });
   }
 
-  const ctx = await GitHubService.getActiveTelemetryContext(req.sessionId);
+  const ctx = await GitHubService.getActiveTelemetryContext();
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
@@ -73,8 +72,8 @@ router.post('/ask', asyncHandler(async (req: any, res) => {
   }
 }));
 
-router.get('/developer-persona', asyncHandler(async (req: any, res) => {
-  const state = await GitHubService.ensureSynced(req.sessionId);
+router.get('/developer-persona', asyncHandler(async (_req, res) => {
+  const state = await GitHubService.ensureSynced();
   if (state.syncStatus === 'error') {
     return res.status(502).json({ error: state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
@@ -87,12 +86,12 @@ router.get('/developer-persona', asyncHandler(async (req: any, res) => {
   res.json(persona);
 }));
 
-router.post('/repo-review', asyncHandler(async (req: any, res) => {
+router.post('/repo-review', asyncHandler(async (req, res) => {
   const repoName = req.body?.repoName;
   if (!repoName || typeof repoName !== 'string') {
     return res.status(400).json({ error: 'repoName alanı zorunludur.' });
   }
-  const state = await GitHubService.ensureSynced(req.sessionId);
+  const state = await GitHubService.ensureSynced();
   const targetRepo = state.repositories.find(r => r.name.toLowerCase() === repoName.toLowerCase());
   if (!targetRepo) {
     return res.status(404).json({ error: `${repoName} deposu bulunamadı.` });
@@ -103,31 +102,54 @@ router.post('/repo-review', asyncHandler(async (req: any, res) => {
   res.json(review);
 }));
 
-router.post('/hotspot-refactor', asyncHandler(async (req: any, res) => {
+router.post('/hotspot-refactor', asyncHandler(async (req, res) => {
   const { filePath, repoName } = req.body || {};
   if (!filePath || !repoName) {
     return res.status(400).json({ error: 'filePath ve repoName alanları zorunludur.' });
   }
-  const state = await GitHubService.ensureSynced(req.sessionId);
+  const state = await GitHubService.ensureSynced();
   const commits = state.commits.filter(c => c.repo_name.toLowerCase() === String(repoName).toLowerCase());
   const hotspots = HotspotEngine.analyzeHotspots(commits);
-  const targetHotspot = hotspots.find(h => h.path === filePath && h.repo_name.toLowerCase() === String(repoName).toLowerCase()) || {
-    path: filePath,
-    repo_name: repoName,
-    language: filePath.split('.').pop() || 'Code',
-    modifications_count: 5,
-    commits_count: 5,
-    contributors_count: 1,
-    lines_added: 200,
-    lines_deleted: 50,
-    code_churn: 250,
-    bug_fix_commits_count: 2,
-    risk_level: 'HIGH' as const,
-    confidence: 90,
-    last_modified: new Date().toISOString(),
-    evidence: [],
-    recommendation: 'Tek Sorumluluk Prensibi ile ayrıştırın.',
-  };
+  let targetHotspot = hotspots.find(
+    (h) => h.path === filePath && h.repo_name.toLowerCase() === String(repoName).toLowerCase()
+  );
+
+  if (!targetHotspot) {
+    // Depo commitlerinden dosyanın gerçek metriklerini dinamik olarak hesapla
+    const fileCommits = commits.filter((c) => (c.affected_files || []).includes(filePath));
+    const authors = new Set(fileCommits.map((c) => c.author));
+    let linesAdded = 0;
+    let linesDeleted = 0;
+    let bugFixes = 0;
+
+    for (const c of fileCommits) {
+      if (c.is_bug_fix) bugFixes += 1;
+      const fMatch = (c.files || []).find((f) => (f.filename || f.path) === filePath);
+      if (fMatch) {
+        linesAdded += fMatch.additions || 0;
+        linesDeleted += fMatch.deletions || 0;
+      }
+    }
+    const churn = linesAdded + linesDeleted;
+
+    targetHotspot = {
+      path: filePath,
+      repo_name: repoName,
+      language: filePath.split('.').pop() || 'Kod',
+      modifications_count: fileCommits.length,
+      commits_count: fileCommits.length,
+      contributors_count: authors.size || 1,
+      lines_added: linesAdded,
+      lines_deleted: linesDeleted,
+      code_churn: churn,
+      bug_fix_commits_count: bugFixes,
+      risk_level: fileCommits.length >= 6 ? 'HIGH' : fileCommits.length >= 3 ? 'MEDIUM' : 'LOW',
+      confidence: fileCommits.length > 0 ? 85 : 70,
+      last_modified: fileCommits[0]?.date || new Date().toISOString(),
+      evidence: [],
+      recommendation: 'Tek Sorumluluk Prensibi (SRP) doğrultusunda modüler bileşenlere ayrıştırın.',
+    };
+  }
   const refactor = await InsightsEngine.suggestHotspotRefactoring(targetHotspot, commits);
   res.json(refactor);
 }));

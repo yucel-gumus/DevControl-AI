@@ -7,7 +7,17 @@ import apiRoutes from './server/routes/api.js';
 
 async function startServer() {
   const app = express();
+  app.disable('x-powered-by');
   const PORT = Number(process.env.PORT) || 3000;
+
+  // HTTP Güvenlik Başlıkları (Security Headers)
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '0');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
 
   // JSON request body parser
   app.use(express.json());
@@ -17,6 +27,11 @@ async function startServer() {
 
   // Modüler API Route'ları
   app.use('/api', apiRoutes);
+
+  // Geçersiz API rotaları için 404 JSON yanıtı (SPA HTML dönülmesini önler)
+  app.all('/api/*', (_req, res) => {
+    res.status(404).json({ error: 'İstenen API uç noktası bulunamadı.' });
+  });
 
   // ==========================================
   // VITE / STATİK SUNUCU

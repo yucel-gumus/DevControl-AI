@@ -94,6 +94,11 @@ export class ToolRegistry {
         properties: {
           repo_name: { type: 'string', description: 'Depo adına göre filtre' },
           is_bug_fix: { type: 'boolean', description: 'Yalnızca hata düzeltme commitlerini filtrele' },
+          category: {
+            type: 'string',
+            enum: ['BUG_FIX', 'FEATURE', 'REFACTOR', 'PERFORMANCE', 'SECURITY', 'DOCUMENTATION', 'CHORE'],
+            description: 'Yapay zeka tarafından tespit edilen anlamsal mühendislik kategorisi',
+          },
           limit: { type: 'number', description: 'Döndürülecek maksimum commit sayısı (varsayılan 20)' },
         },
       },
@@ -105,6 +110,9 @@ export class ToolRegistry {
         }
         if (args.is_bug_fix !== undefined) {
           results = results.filter((c) => c.is_bug_fix === args.is_bug_fix);
+        }
+        if (args.category) {
+          results = results.filter((c) => c.ai_category === args.category);
         }
         const requestedLimit = Number(args.limit);
         const limit = Number.isFinite(requestedLimit) ? Math.max(0, Math.min(100, requestedLimit)) : 20;

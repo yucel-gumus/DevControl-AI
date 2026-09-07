@@ -210,7 +210,13 @@ export const HotspotsView: React.FC<Props> = ({
                         category: risk.affectedRepository || risk.repo_name,
                         summary: risk.summary,
                         confidence: risk.confidence,
-                        evidence: risk.evidence,
+                        evidence: Array.isArray(risk.evidence)
+                          ? risk.evidence.map((e: any) =>
+                              typeof e === 'string'
+                                ? e
+                                : `${e.metric}: ${e.value}${e.description ? ` — ${e.description}` : ''}`
+                            )
+                          : [],
                         recommendedAction: risk.recommendedAction,
                       })
                     }

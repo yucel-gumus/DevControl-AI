@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, HelpCircle, AlertTriangle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { X, HelpCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { formatConfidence } from '../utils/formatters.js';
 
 export interface ExplainWhyData {
   title: string;
@@ -7,7 +8,7 @@ export interface ExplainWhyData {
   summary: string;
   impactScore?: number;
   confidence?: number;
-  evidence?: string[];
+  evidence?: Array<string | { metric?: string; value?: string | number; description?: string }>;
   actionPlan?: string[];
   recommendedAction?: string;
 }
@@ -40,13 +41,18 @@ export const ExplainWhyModal: React.FC<Props> = ({
               <HelpCircle className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
                   {data.category}
                 </span>
-                {data.confidence && (
+                {data.confidence !== undefined && data.confidence !== null && (
                   <span className="text-[11px] text-[#4a3e3b] font-medium">
-                    Güven: %{Math.round(data.confidence * 100)}
+                    Güven: {formatConfidence(data.confidence)}
+                  </span>
+                )}
+                {data.impactScore !== undefined && data.impactScore !== null && (
+                  <span className="text-[11px] text-[#4a3e3b] font-medium">
+                    Etki: {data.impactScore}/100
                   </span>
                 )}
               </div>
@@ -83,15 +89,22 @@ export const ExplainWhyModal: React.FC<Props> = ({
               <span>Gözlemlenen Telemetri Kanıtları</span>
             </h4>
             <ul className="space-y-1.5">
-              {data.evidence.map((ev, idx) => (
-                <li
-                  key={idx}
-                  className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-xs text-[#4a3e3b] flex items-start gap-2 font-medium"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
-                  <span>{ev}</span>
-                </li>
-              ))}
+              {data.evidence.map((ev, idx) => {
+                const text = typeof ev === 'string'
+                  ? ev
+                  : (ev && typeof ev === 'object')
+                    ? `${(ev as any).metric || 'Kanıt'}: ${(ev as any).value ?? ''}${(ev as any).description ? ` — ${(ev as any).description}` : ''}`
+                    : String(ev);
+                return (
+                  <li
+                    key={idx}
+                    className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-xs text-[#4a3e3b] flex items-start gap-2 font-medium"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
+                    <span>{text}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

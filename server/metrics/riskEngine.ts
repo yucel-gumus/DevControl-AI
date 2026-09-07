@@ -1,12 +1,13 @@
 import { CommitMetric, PullRequestMetric, IssueMetric, Repository, FileHotspot, EngineeringRisk } from '../../src/types.js';
+import { MS_PER_HOUR, STALE_ISSUE_THRESHOLD_DAYS } from '../constants.js';
 
 export class RiskEngine {
   /**
    * Destekleyici kanıtlarla birlikte mühendislik risklerini deterministik olarak hesaplar
    */
   public static analyzeRisks(
-    _repositories: Repository[],
-    _commits: CommitMetric[],
+    repositories: Repository[],
+    commits: CommitMetric[],
     prs: PullRequestMetric[],
     issues: IssueMetric[],
     hotspots: FileHotspot[]
@@ -62,7 +63,7 @@ export class RiskEngine {
       const topStale = stalePRs[0];
       const createdTime = new Date(topStale.created_at).getTime();
       const openAgeHours = Number.isFinite(createdTime)
-        ? Math.max(0, (Date.now() - createdTime) / (1000 * 60 * 60))
+        ? Math.max(0, (Date.now() - createdTime) / MS_PER_HOUR)
         : 0;
       const openAgeDays = Math.max(1, Math.round(openAgeHours / 24));
       risks.push({
@@ -149,12 +150,40 @@ export class RiskEngine {
             metric: 'Durgun Sorun Sayısı',
             value: `${staleIssues.length} madde`,
             baseline: 'Hedef: 0 durgun madde',
-            description: '>14 gündür aktif commit veya yorum almayan sorunlar.',
+            description: `>${STALE_ISSUE_THRESHOLD_DAYS} gündür aktif commit veya yorum almayan sorunlar.`,
           },
         ],
         confidence: 82,
         recommendedAction: 'Haftalık 15 dakikalık değerlendirme oturumu düzenleyerek eskiyen sorunları ya kapatın ya da aktif sprint hedeflerine planlayın.',
         firstDetected: staleIssues[0].created_at,
+        status: 'OPEN',
+      });
+    }
+
+    // 5. Yüksek Hata Düzeltme Regresyon Riski (High Bug-Fix Churn Risk)
+    const bugFixCommits = commits.filter((c) => c.is_bug_fix);
+    const bugFixRatio = commits.length > 0 ? bugFixCommits.length / commits.length : 0;
+    if (commits.length >= 10 && bugFixRatio >= 0.35) {
+      const topRepo = repositories[0]?.name || commits[0]?.repo_name || 'Kişisel Depo';
+      risks.push({
+        id: 'risk_bugfix_regression_surge',
+        title: `Yüksek Hata Düzeltme Yoğunluğu (%${Math.round(bugFixRatio * 100)} Hata Oranı)`,
+        severity: 'HIGH',
+        category: 'QUALITY_REGRESSION',
+        affectedRepository: topRepo,
+        repo_name: topRepo,
+        summary: `Son commit akışının %${Math.round(bugFixRatio * 100)}'lik kısmı hata düzeltmelerinden oluşuyor. Bu durum son değişikliklerde regresyon yaşandığına işaret etmektedir.`,
+        evidence: [
+          {
+            metric: 'Hata Düzeltme Oranı',
+            value: `%${Math.round(bugFixRatio * 100)} (${bugFixCommits.length} / ${commits.length} commit)`,
+            baseline: 'Hedef: < %20',
+            description: 'Yüksek hata düzeltme oranı kod tabanında stabilite kaybına işaret eder.',
+          },
+        ],
+        confidence: 90,
+        recommendedAction: 'Yeni özellik geliştirmeyi durdurup regresyon testlerini genişletin ve kök neden analizine odaklanın.',
+        firstDetected: bugFixCommits[0]?.date || new Date().toISOString(),
         status: 'OPEN',
       });
     }

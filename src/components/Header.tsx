@@ -10,6 +10,7 @@ interface Props {
   onSync: () => void;
   isSyncing: boolean;
   onOpenAskAi: () => void;
+  isAskAiActive?: boolean;
   rateLimitStatus?: RateLimitStatus;
 }
 
@@ -21,6 +22,7 @@ export const Header: React.FC<Props> = ({
   onSync,
   isSyncing,
   onOpenAskAi,
+  isAskAiActive = false,
   rateLimitStatus,
 }) => {
   const isPartial = healthScore?.dataStatus === 'partial';
@@ -86,10 +88,15 @@ export const Header: React.FC<Props> = ({
         <button
           id="header-btn-ask-ai"
           onClick={onOpenAskAi}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-[#231c1a]/15 bg-[#f9b88e] text-[#231c1a] hover:brightness-105 transition-all cursor-pointer shadow-xs"
+          aria-label="KENSAI Analistini aç veya kapat"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs ${
+            isAskAiActive
+              ? 'bg-[#231c1a] text-[#f9b88e] border border-[#231c1a] ring-2 ring-[#f9b88e]/40'
+              : 'border border-[#231c1a]/15 bg-[#f9b88e] text-[#231c1a] hover:brightness-105'
+          }`}
         >
-          <Terminal className="w-3.5 h-3.5 text-[#231c1a]" />
-          <span>Yapay Zeka</span>
+          <Terminal className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>KENSAI</span>
         </button>
 
         {/* Verileri Yenile Butonu */}
@@ -97,9 +104,10 @@ export const Header: React.FC<Props> = ({
           id="header-btn-sync"
           onClick={onSync}
           disabled={isSyncing}
+          aria-label={isSyncing ? 'GitHub verileri eşitleniyor' : 'GitHub verilerini yenile'}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] hover:brightness-105 transition-all cursor-pointer shadow-xs disabled:opacity-50 border border-[#231c1a]/15"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} aria-hidden="true" />
           <span>{isSyncing ? 'Yenileniyor...' : 'Yenile'}</span>
         </button>
       </div>

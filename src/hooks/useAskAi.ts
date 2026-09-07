@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AskAiMessage, AnalysisTrace } from '../types.js';
+import { apiClient } from '../utils/apiClient.js';
 
 export function useAskAi() {
   const [chatMessages, setChatMessages] = useState<AskAiMessage[]>([
@@ -28,31 +29,17 @@ export function useAskAi() {
     setChatMessages((prev) => [...prev, userMsg]);
     setIsAiLoading(true);
     setActiveTrace(null);
-
     try {
-      const sessionId = localStorage.getItem('sessionId');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (sessionId) headers['x-session-id'] = sessionId;
+      const data = await apiClient<any>('/api/ai/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, question: query }),
+        timeoutMs: 35_000,
+      });
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 35_000);
-      let data: any;
-      try {
-        const res = await fetch('/api/ai/ask', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ query, question: query }),
-          signal: controller.signal,
-        });
-        data = await res.json().catch(() => null);
-        if (!res.ok) {
-          throw new Error(data?.error || `Yapay zeka isteği başarısız oldu (${res.status}).`);
-        }
-      } finally {
-        clearTimeout(timeout);
-      }
+      const trace = data.trace || data.message?.trace;
+      const toolsUsed: string[] = Array.isArray(trace?.toolsUsed) ? trace.toolsUsed : [];
+      const toolInvocations = toolsUsed.map((toolName: string) => ({ toolName }));
 
       const assistantMsg: AskAiMessage = {
         id: `msg_asst_${Date.now()}`,
@@ -63,11 +50,12 @@ export function useAskAi() {
         interpretation: data.interpretation || data.message?.interpretation || '',
         evidence: data.evidence || data.message?.evidence || [],
         recommendedActions: data.recommendedActions || data.message?.recommendedActions || [],
-        trace: data.trace || data.message?.trace,
+        trace,
+        toolInvocations,
       };
 
-      if (assistantMsg.trace) {
-        setActiveTrace(assistantMsg.trace);
+      if (trace) {
+        setActiveTrace(trace);
       }
 
       setChatMessages((prev) => [...prev, assistantMsg]);

@@ -8,7 +8,6 @@ import { HotspotsView } from './components/HotspotsView.js';
 import { AskAiView } from './components/AskAiView.js';
 import { RepositoriesView } from './components/RepositoriesView.js';
 import { ExplainWhyModal, ExplainWhyData } from './components/ExplainWhyModal.js';
-import { Repository } from './types.js';
 import {
   useAuthStatus,
   useRepositories,
@@ -24,7 +23,6 @@ import { useAskAi } from './hooks/useAskAi.js';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
-  const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const queryClient = useQueryClient();
 
   // Modal State
@@ -172,7 +170,8 @@ export default function App() {
           lastSyncAt={lastSyncAt}
           onSync={() => syncReposMutation.mutate()}
           isSyncing={isSyncing}
-          onOpenAskAi={() => setActiveTab('ask')}
+          onOpenAskAi={() => setActiveTab((prev) => (prev === 'ask' ? 'overview' : 'ask'))}
+          isAskAiActive={activeTab === 'ask'}
           rateLimitStatus={rateLimitStatus}
         />
 
@@ -226,7 +225,7 @@ export default function App() {
                 activityLoading={activityQuery.isLoading}
                 activityError={activityQuery.error ? getErrorMessage(activityQuery.error) : null}
                 onExplainWhy={handleOpenExplain}
-                onSelectRepo={setSelectedRepo}
+                onSelectRepo={(repo) => handleAskAboutRepo(repo.name)}
                 onNavigateToTab={setActiveTab}
               />
             )}
@@ -254,21 +253,9 @@ export default function App() {
             {activeTab === 'repositories' && (
               <RepositoriesView
                 repositories={repositories}
-                hotspots={hotspots}
                 user={user}
-                onToggleSelectRepo={handleToggleSelectRepo}
                 onToggleRepo={handleToggleSelectRepo}
                 onAskAboutRepo={handleAskAboutRepo}
-                selectedRepo={selectedRepo}
-                onSelectRepo={setSelectedRepo}
-                onSync={() => {
-                  syncReposMutation.mutate();
-                }}
-                syncStatus={authData?.syncStatus || reposData?.syncStatus}
-                syncError={syncError}
-                telemetryStatus={authData?.telemetryStatus || reposData?.telemetryStatus}
-                isSyncing={isSyncing}
-                rateLimitStatus={rateLimitStatus}
               />
             )}
 

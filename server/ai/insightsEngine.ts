@@ -16,29 +16,32 @@ import {
 } from '../../src/types.js';
 import { Type } from '@google/genai';
 
-/**
- * İngilizce kalıpları yakalayıp Türkçe karşılıklarına dönüştüren güvenlik filtresi
- */
-function toTurkishText(text: string): string {
-  if (!text || typeof text !== 'string') return text;
+interface GeminiBriefItem {
+  priority?: 'HIGH' | 'MEDIUM' | 'LOW';
+  title?: string;
+  description?: string;
+  relatedRepo?: string;
+  actionable?: boolean;
+  evidenceSummary?: string;
+}
 
-  let out = text;
-  out = out.replace(/High change volatility\s*&\s*bug concentration in\s*(.+)/gi, '$1 dosyasında yüksek değişim oynaklığı ve hata yoğunluğu');
-  out = out.replace(/High change volatility in\s*(.+)/gi, '$1 dosyasında yüksek değişim oynaklığı');
-  out = out.replace(/Code hotspot in\s*([^:]+):\s*(.+)/gi, '$1 deposunda kod sıcak noktası: $2');
-  out = out.replace(/Code hotspot in\s*(.+)/gi, '$1 üzerinde kod sıcak noktası');
-  out = out.replace(/Recurring churn in\s*(.+)/gi, '$1 üzerinde tekrarlayan kod dalgalanması');
-  out = out.replace(/Exemplary engineering hygiene in\s*(.+)/gi, '$1 deposunda örnek mühendislik disiplini');
-  out = out.replace(/Delivery bottleneck in\s*(.+)/gi, '$1 deposunda teslimat darboğazı');
-  out = out.replace(/Documentation gap in\s*(.+)/gi, '$1 deposunda dokümantasyon eksikliği');
-  out = out.replace(/Technical debt in\s*(.+)/gi, '$1 deposunda teknik borç');
-  out = out.replace(/Stale PRs? in\s*(.+)/gi, '$1 deposunda geciken PR');
-  out = out.replace(/commits? analyzed/gi, 'commit analiz edildi');
-  out = out.replace(/hotspots? detected/gi, 'sıcak nokta tespit edildi');
-  out = out.replace(/risk score/gi, 'risk skoru');
-  out = out.replace(/health score/gi, 'sağlık skoru');
+interface GeminiInsightItem {
+  title?: string;
+  summary?: string;
+  priority?: 'HIGH' | 'MEDIUM' | 'LOW' | 'OPPORTUNITY';
+  category?: 'ARCHITECTURE' | 'PRODUCTIVITY' | 'HOTSPOT' | 'PROCESS' | 'SKILLS';
+  targetRepo?: string;
+  facts?: string[];
+  aiInterpretation?: string;
+  confidence?: number;
+  evidence?: { metric: string; value: string | number; source: string }[];
+  recommendedAction?: string;
+}
 
-  return out;
+interface GeminiRoadmapItem {
+  title?: string;
+  description?: string;
+  priority?: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
 /**
@@ -77,8 +80,8 @@ export class InsightsEngine {
       dynamicBriefItems.push({
         id: `brief_risk_${topRisk.id}`,
         priority: topRisk.severity === 'CRITICAL' || topRisk.severity === 'HIGH' ? 'HIGH' : 'MEDIUM',
-        title: toTurkishText(topRisk.title),
-        description: toTurkishText(topRisk.summary),
+        title: topRisk.title,
+        description: topRisk.summary,
         relatedRepo: topRisk.affectedRepository,
         actionable: true,
         evidenceSummary: topRisk.evidence[0] ? `${topRisk.evidence[0].metric}: ${topRisk.evidence[0].value}` : `Güven Skoru: %${topRisk.confidence}`,
@@ -118,8 +121,8 @@ export class InsightsEngine {
       dynamicBriefItems.push({
         id: `brief_risk_${secondRisk.id}`,
         priority: secondRisk.severity === 'HIGH' ? 'HIGH' : 'MEDIUM',
-        title: toTurkishText(secondRisk.title),
-        description: toTurkishText(secondRisk.summary),
+        title: secondRisk.title,
+        description: secondRisk.summary,
         relatedRepo: secondRisk.affectedRepository,
         actionable: true,
         evidenceSummary: secondRisk.evidence[0] ? `${secondRisk.evidence[0].metric}: ${secondRisk.evidence[0].value}` : `Güven Skoru: %${secondRisk.confidence}`,
@@ -211,14 +214,14 @@ Aktif Riskler: ${risks.map((r) => `${r.affectedRepository}: ${r.title}`).join(';
       if (response.text) {
         const parsed = JSON.parse(response.text.trim());
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((item: any, idx: number) => ({
+          return (parsed as GeminiBriefItem[]).map((item, idx: number) => ({
             id: `brief_ai_${idx}_${Date.now()}`,
             priority: item.priority || 'MEDIUM',
-            title: toTurkishText(item.title),
-            description: toTurkishText(item.description),
-            relatedRepo: item.relatedRepo,
+            title: item.title || 'Mühendislik Güncellemesi',
+            description: item.description || '',
+            relatedRepo: item.relatedRepo || 'Genel',
             actionable: item.actionable ?? true,
-            evidenceSummary: toTurkishText(item.evidenceSummary),
+            evidenceSummary: item.evidenceSummary || '',
           }));
         }
       }
@@ -414,18 +417,22 @@ JSON ŞEMASI:
         if (response.text) {
           const parsed = JSON.parse(response.text.trim());
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map((item: any, idx: number) => ({
+            return (parsed as GeminiInsightItem[]).map((item, idx: number): AIInsight => ({
               id: `insight_ai_${idx}_${Date.now()}`,
-              title: toTurkishText(item.title),
-              summary: toTurkishText(item.summary),
-              priority: item.priority || 'MEDIUM',
-              category: item.category || 'ARCHITECTURE',
+              title: item.title || 'Mühendislik İçgörüsü',
+              summary: item.summary || '',
+              priority: (item.priority && ['HIGH', 'MEDIUM', 'LOW', 'OPPORTUNITY'].includes(item.priority))
+                ? item.priority
+                : 'MEDIUM',
+              category: (item.category && ['ARCHITECTURE', 'PRODUCTIVITY', 'HOTSPOT', 'PROCESS', 'SKILLS'].includes(item.category))
+                ? item.category
+                : 'ARCHITECTURE',
               targetRepo: item.targetRepo || defaultRepo,
-              facts: Array.isArray(item.facts) ? item.facts.map((f: string) => toTurkishText(f)) : [],
-              aiInterpretation: toTurkishText(item.aiInterpretation),
+              facts: Array.isArray(item.facts) ? item.facts : [],
+              aiInterpretation: item.aiInterpretation || '',
               confidence: Number(item.confidence) || 90,
               evidence: Array.isArray(item.evidence) ? item.evidence : [],
-              recommendedAction: toTurkishText(item.recommendedAction),
+              recommendedAction: item.recommendedAction || 'Kod tabanını ve ilgili metrikleri inceleyin.',
               createdAt: new Date().toISOString(),
             }));
           }
@@ -525,14 +532,14 @@ ${repoCommits.slice(0, 12).map(c => `- ${c.message} (+${c.additions}/-${c.deleti
           const parsed = JSON.parse(response.text.trim());
           return {
             repoName: repo.name,
-            architectureOverview: toTurkishText(parsed.architectureOverview || defaultReview.architectureOverview),
+            architectureOverview: parsed.architectureOverview || defaultReview.architectureOverview,
             codeQualityScore: Math.min(100, Math.max(0, Number(parsed.codeQualityScore) || 85)),
-            strengths: Array.isArray(parsed.strengths) ? parsed.strengths.map((s: string) => toTurkishText(s)) : defaultReview.strengths,
-            technicalDebts: Array.isArray(parsed.technicalDebts) ? parsed.technicalDebts.map((s: string) => toTurkishText(s)) : defaultReview.technicalDebts,
-            securityObservations: Array.isArray(parsed.securityObservations) ? parsed.securityObservations.map((s: string) => toTurkishText(s)) : defaultReview.securityObservations,
-            recommendedRoadmap: Array.isArray(parsed.recommendedRoadmap) ? parsed.recommendedRoadmap.map((r: any) => ({
-              title: toTurkishText(r.title),
-              description: toTurkishText(r.description),
+            strengths: Array.isArray(parsed.strengths) ? parsed.strengths : defaultReview.strengths,
+            technicalDebts: Array.isArray(parsed.technicalDebts) ? parsed.technicalDebts : defaultReview.technicalDebts,
+            securityObservations: Array.isArray(parsed.securityObservations) ? parsed.securityObservations : defaultReview.securityObservations,
+            recommendedRoadmap: Array.isArray(parsed.recommendedRoadmap) ? (parsed.recommendedRoadmap as GeminiRoadmapItem[]).map((r) => ({
+              title: r.title || 'İyileştirme Adımı',
+              description: r.description || '',
               priority: r.priority || 'MEDIUM',
             })) : defaultReview.recommendedRoadmap,
             reviewedAt: new Date().toISOString(),
@@ -570,7 +577,7 @@ ${repoCommits.slice(0, 12).map(c => `- ${c.message} (+${c.additions}/-${c.deleti
 
     const bugFixCount = commits.filter(c => c.is_bug_fix).length;
     const bugFixRate = commits.length > 0 ? Math.round((bugFixCount / commits.length) * 100) : 0;
-    const conventionalCount = commits.filter(c => /^(feat|fix|refactor|docs|test|chore|style|perf|ci)(\(.+\))?:/i.test(c.message)).length;
+    const conventionalCount = commits.filter(c => Boolean(c.ai_category)).length;
     const conventionalRate = commits.length > 0 ? Math.round((conventionalCount / commits.length) * 100) : 0;
 
     const defaultPersona: DeveloperPersona = {
@@ -640,17 +647,17 @@ ${commits.slice(0, 15).map(c => `- ${c.message}`).join('\n') || '- Doğrudan com
         if (response.text) {
           const parsed = JSON.parse(response.text.trim());
           return {
-            personaTitle: toTurkishText(parsed.personaTitle || defaultPersona.personaTitle),
-            summary: toTurkishText(parsed.summary || defaultPersona.summary),
+            personaTitle: parsed.personaTitle || defaultPersona.personaTitle,
+            summary: parsed.summary || defaultPersona.summary,
             primaryLanguages: Array.isArray(parsed.primaryLanguages) && parsed.primaryLanguages.length > 0 ? parsed.primaryLanguages : primaryLanguages,
             productivityMetrics: {
               weeklyCommitFrequency: Number(parsed.productivityMetrics?.weeklyCommitFrequency) || defaultPersona.productivityMetrics.weeklyCommitFrequency,
-              dominantWorkingHours: toTurkishText(parsed.productivityMetrics?.dominantWorkingHours || defaultPersona.productivityMetrics.dominantWorkingHours),
-              bugFixEfficiency: toTurkishText(parsed.productivityMetrics?.bugFixEfficiency || defaultPersona.productivityMetrics.bugFixEfficiency),
-              conventionalCommitHygiene: toTurkishText(parsed.productivityMetrics?.conventionalCommitHygiene || defaultPersona.productivityMetrics.conventionalCommitHygiene),
+              dominantWorkingHours: parsed.productivityMetrics?.dominantWorkingHours || defaultPersona.productivityMetrics.dominantWorkingHours,
+              bugFixEfficiency: parsed.productivityMetrics?.bugFixEfficiency || defaultPersona.productivityMetrics.bugFixEfficiency,
+              conventionalCommitHygiene: parsed.productivityMetrics?.conventionalCommitHygiene || defaultPersona.productivityMetrics.conventionalCommitHygiene,
             },
-            superpowers: Array.isArray(parsed.superpowers) ? parsed.superpowers.map((s: string) => toTurkishText(s)) : defaultPersona.superpowers,
-            growthAreas: Array.isArray(parsed.growthAreas) ? parsed.growthAreas.map((g: string) => toTurkishText(g)) : defaultPersona.growthAreas,
+            superpowers: Array.isArray(parsed.superpowers) ? parsed.superpowers : defaultPersona.superpowers,
+            growthAreas: Array.isArray(parsed.growthAreas) ? parsed.growthAreas : defaultPersona.growthAreas,
             analyzedAt: new Date().toISOString(),
           };
         }
@@ -743,11 +750,11 @@ ${relevantCommits.slice(0, 5).map(c => `- ${c.message}`).join('\n') || '- Yakın
           return {
             filePath: hotspot.path,
             repoName: hotspot.repo_name,
-            antiPatternsDetected: Array.isArray(parsed.antiPatternsDetected) ? parsed.antiPatternsDetected.map((p: string) => toTurkishText(p)) : defaultRec.antiPatternsDetected,
-            proposedDesignPattern: toTurkishText(parsed.proposedDesignPattern || defaultRec.proposedDesignPattern),
-            refactorSteps: Array.isArray(parsed.refactorSteps) ? parsed.refactorSteps.map((s: string) => toTurkishText(s)) : defaultRec.refactorSteps,
+            antiPatternsDetected: Array.isArray(parsed.antiPatternsDetected) ? parsed.antiPatternsDetected : defaultRec.antiPatternsDetected,
+            proposedDesignPattern: parsed.proposedDesignPattern || defaultRec.proposedDesignPattern,
+            refactorSteps: Array.isArray(parsed.refactorSteps) ? parsed.refactorSteps : defaultRec.refactorSteps,
             sampleCodeSnippet: parsed.sampleCodeSnippet || defaultRec.sampleCodeSnippet,
-            expectedImpact: toTurkishText(parsed.expectedImpact || defaultRec.expectedImpact),
+            expectedImpact: parsed.expectedImpact || defaultRec.expectedImpact,
           };
         }
         return null;

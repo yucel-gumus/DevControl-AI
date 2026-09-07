@@ -2,10 +2,8 @@ import React from 'react';
 import {
   LayoutDashboard,
   Flame,
-  Terminal,
   FolderGit2,
   Github,
-  Sparkles,
   ExternalLink,
 } from 'lucide-react';
 import { GitHubUser } from '../types.js';
@@ -48,13 +46,6 @@ export const Sidebar: React.FC<Props> = ({
       icon: Flame,
       badge: totalIssuesCount > 0 ? totalIssuesCount : undefined,
       description: 'Kod Kalitesi & Risk Radarı',
-    },
-    {
-      id: 'ask' as ActiveTab,
-      label: 'Yapay Zeka Analisti',
-      icon: Terminal,
-      isAi: true,
-      description: 'Mühendislik Soru & Cevap',
     },
     {
       id: 'repositories' as ActiveTab,
@@ -102,6 +93,8 @@ export const Sidebar: React.FC<Props> = ({
                 key={item.id}
                 id={`nav-item-${item.id}`}
                 onClick={() => onSelectTab(item.id)}
+                aria-label={`${item.label} sekmesine geç`}
+                aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs transition-all cursor-pointer text-left group relative ${
                   isActive
                     ? 'bg-[#f9b88e] text-[#231c1a] font-bold border border-[#231c1a]/20 shadow-xs'
@@ -110,6 +103,7 @@ export const Sidebar: React.FC<Props> = ({
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Icon
+                    aria-hidden="true"
                     className={`w-4 h-4 shrink-0 transition-colors ${
                       isActive
                         ? 'text-[#231c1a]'
@@ -120,9 +114,6 @@ export const Sidebar: React.FC<Props> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {item.isAi && (
-                    <Sparkles className="w-3.5 h-3.5 text-[#231c1a]" />
-                  )}
                   {item.badge !== undefined && (
                     <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20">
                       {item.badge}
@@ -161,6 +152,7 @@ export const Sidebar: React.FC<Props> = ({
           target="_blank"
           rel="author external"
           title="Geliştirici: Yücel Gümüş (yucelgumus.dev)"
+          aria-label="Geliştirici Yücel Gümüş web sitesini ziyaret et (yeni sekmede açılır)"
           className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-transparent hover:border-[#a89997] hover:bg-[#b9aba9]/40 transition-all group"
         >
           <div className="flex items-center gap-2.5 min-w-0">
@@ -185,7 +177,7 @@ export const Sidebar: React.FC<Props> = ({
               </span>
             </div>
           </div>
-          <ExternalLink className="w-3 h-3 text-[#6e5f5c] group-hover:text-[#231c1a] shrink-0" />
+          <ExternalLink className="w-3 h-3 text-[#6e5f5c] group-hover:text-[#231c1a] shrink-0" aria-hidden="true" />
         </a>
       </div>
     </aside>

@@ -8,11 +8,18 @@ import {
   TelemetrySyncStatus,
   RateLimitStatus,
 } from '../../src/types.js';
-import { randomUUID } from 'crypto';
-import { GITHUB_REQUEST_TIMEOUT_MS, TELEMETRY_WINDOW_DAYS, STALE_ISSUE_THRESHOLD_DAYS } from '../constants.js';
+import {
+  GITHUB_REQUEST_TIMEOUT_MS,
+  TELEMETRY_WINDOW_DAYS,
+  STALE_ISSUE_THRESHOLD_DAYS,
+  STALE_PR_THRESHOLD_DAYS,
+  MS_PER_DAY,
+  MS_PER_HOUR,
+} from '../constants.js';
 import { HotspotEngine } from '../metrics/hotspotEngine.js';
 import { RiskEngine } from '../metrics/riskEngine.js';
 import { HealthEngine } from '../metrics/healthEngine.js';
+import { CommitSemanticClassifier } from '../ai/commitClassifier.js';
 
 export const INITIAL_USER: GitHubUser = {
   id: '0',
@@ -40,15 +47,129 @@ export interface GitHubStoreState {
   telemetryStatus: TelemetrySyncStatus;
 }
 
-export class GitHubService {
-  // In-memory session store (Kişisel hesap odaklı birincil store)
-  private static sessions: Map<string, GitHubStoreState> = new Map();
-  private static syncPromises: Map<string, Promise<{ sessionId: string; state: GitHubStoreState }>> = new Map();
-  private static syncTokens: Map<string, string> = new Map();
+class BoundedCache<K, V> {
+  private cache = new Map<K, V>();
+  constructor(private readonly maxSize = 1000) {}
 
-  // Commit ve PR detay önbelleği (N+1 tekrar isteklerini ve rate limit tükenmesini önler)
-  private static commitDetailCache: Map<string, any> = new Map();
-  private static prDetailCache: Map<string, any> = new Map();
+  get(key: K): V | undefined {
+    const item = this.cache.get(key);
+    if (item !== undefined) {
+      this.cache.delete(key);
+      this.cache.set(key, item);
+    }
+    return item;
+  }
+
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxSize) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) this.cache.delete(oldestKey);
+    }
+    this.cache.set(key, value);
+  }
+
+  has(key: K): boolean {
+    return this.cache.has(key);
+  }
+}
+
+interface GitHubApiRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  html_url: string;
+  description: string | null;
+  language: string | null;
+  private: boolean;
+  default_branch: string;
+  stargazers_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  updated_at: string;
+  pushed_at: string;
+  owner?: {
+    login?: string;
+    type?: string;
+  };
+}
+
+interface GitHubApiCommitFile {
+  filename: string;
+  additions?: number;
+  deletions?: number;
+  changes?: number;
+}
+
+interface GitHubApiCommitSummary {
+  sha: string;
+  commit?: {
+    message?: string;
+    author?: { name?: string; date?: string };
+    committer?: { date?: string };
+  };
+  author?: {
+    login?: string;
+    avatar_url?: string;
+  };
+  files?: GitHubApiCommitFile[];
+  stats?: {
+    additions?: number;
+    deletions?: number;
+    total?: number;
+  };
+}
+
+interface GitHubApiCommitDetail extends GitHubApiCommitSummary {}
+
+interface GitHubApiPRSummary {
+  id: number;
+  number: number;
+  title: string;
+  state: string;
+  created_at: string;
+  updated_at?: string;
+  closed_at?: string;
+  merged_at?: string;
+  user?: {
+    login?: string;
+  };
+  additions?: number;
+  deletions?: number;
+  changed_files?: number;
+  comments?: number;
+  review_comments?: number;
+}
+
+interface GitHubApiPRDetail extends GitHubApiPRSummary {}
+
+interface GitHubApiIssue {
+  id: number;
+  number: number;
+  title: string;
+  state: string;
+  created_at: string;
+  closed_at?: string;
+  updated_at?: string;
+  user?: {
+    login?: string;
+  };
+  comments?: number;
+  labels?: Array<{ name?: string }>;
+  pull_request?: unknown;
+}
+
+export class GitHubService {
+  // Tekil Kişisel GitHub Store (Tek hesap ve .env GITHUB_TOKEN odaklı)
+  private static state: GitHubStoreState | null = null;
+  private static activeSyncPromise: Promise<GitHubStoreState> | null = null;
+  private static activeSyncToken: string | null = null;
+  private static activeTogglePromise: Promise<Repository[]> | null = null;
+
+  // Commit ve PR detay önbelleği (Bellek sızıntısı ve rate limit tükenmesini önler)
+  private static commitDetailCache = new BoundedCache<string, GitHubApiCommitDetail>(1000);
+  private static prDetailCache = new BoundedCache<string, GitHubApiPRDetail>(500);
 
   // GitHub API Rate Limit durum takibi
   private static rateLimitStatus: RateLimitStatus = {
@@ -58,8 +179,6 @@ export class GitHubService {
     used: 0,
     updatedAt: new Date().toISOString(),
   };
-
-  private static readonly SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
   public static getRateLimitStatus(): RateLimitStatus {
     return { ...this.rateLimitStatus };
@@ -96,18 +215,6 @@ export class GitHubService {
       syncStatus: 'idle',
       telemetryStatus: this.createTelemetryStatus('idle'),
     };
-  }
-
-  private static cleanupStaleSessions() {
-    const now = Date.now();
-    for (const [sessionId, state] of this.sessions.entries()) {
-      if (this.syncPromises.has(sessionId)) {
-        continue;
-      }
-      if (state.lastAccessedAt && now - state.lastAccessedAt > this.SESSION_TTL_MS) {
-        this.sessions.delete(sessionId);
-      }
-    }
   }
 
   private static enforcePersonalRepositoryScope(state: GitHubStoreState): void {
@@ -157,27 +264,19 @@ export class GitHubService {
     }
   }
 
-  public static getState(_sessionId: string = 'default'): GitHubStoreState {
-    this.cleanupStaleSessions();
-    const canonicalSid = 'default';
-    if (!this.sessions.has(canonicalSid)) {
-      const initial = this.getInitialState();
+  public static getState(): GitHubStoreState {
+    if (!this.state) {
+      this.state = this.getInitialState();
       if (process.env.GITHUB_TOKEN) {
-        initial.token = process.env.GITHUB_TOKEN.trim();
+        this.state.token = process.env.GITHUB_TOKEN.trim();
       }
-      this.sessions.set(canonicalSid, initial);
     }
-    const state = this.sessions.get(canonicalSid)!;
-    if (!state.token && process.env.GITHUB_TOKEN) {
-      state.token = process.env.GITHUB_TOKEN.trim();
+    if (!this.state.token && process.env.GITHUB_TOKEN) {
+      this.state.token = process.env.GITHUB_TOKEN.trim();
     }
-    this.enforcePersonalRepositoryScope(state);
-    state.lastAccessedAt = Date.now();
-    return state;
-  }
-  
-  public static getAllSessionsCount(): number {
-    return this.sessions.size;
+    this.enforcePersonalRepositoryScope(this.state);
+    this.state.lastAccessedAt = Date.now();
+    return this.state;
   }
 
   private static async fetchJson<T>(url: string, headers: Record<string, string>): Promise<T> {
@@ -211,8 +310,8 @@ export class GitHubService {
         throw error;
       }
       return (await response.json()) as T;
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
+    } catch (err: unknown) {
+      if ((err as { name?: string })?.name === 'AbortError') {
         throw new Error(`GitHub isteği ${GITHUB_REQUEST_TIMEOUT_MS / 1000} saniye içinde yanıt vermedi.`);
       }
       if (err instanceof Error) throw err;
@@ -222,48 +321,38 @@ export class GitHubService {
     }
   }
 
-  public static async connectWithToken(token: string, sessionId?: string): Promise<{ sessionId: string, state: GitHubStoreState }> {
-    const sid = sessionId || randomUUID();
+  public static async connectWithToken(token: string): Promise<GitHubStoreState> {
     const normalizedToken = token.trim();
     if (!normalizedToken) {
       throw new Error('GitHub token alanı zorunludur.');
     }
 
-    // Aynı session ve token için gerçek bir single-flight garantisi ver.
-    // Bekleyen promise tamamlandıktan sonra tekrar sync başlatmak, ilk ekranın
-    // paralel query'leriyle aynı hesabı defalarca taramamıza neden oluyordu.
-    while (true) {
-      const runningSync = this.syncPromises.get(sid);
-      if (!runningSync) break;
-
-      if (this.syncTokens.get(sid) === normalizedToken) {
-        return await runningSync;
+    if (this.activeSyncPromise) {
+      if (this.activeSyncToken === normalizedToken) {
+        return this.activeSyncPromise;
       }
-
-      // Farklı bir token ile gelen bilinçli bağlantı, mevcut sync bitince
-      // sıraya girer. Aynı token ise yukarıdaki branch doğrudan paylaşır.
       try {
-        await runningSync;
+        await this.activeSyncPromise;
       } catch {
-        // Yeni token denemesi önceki hatadan bağımsız olarak devam edebilir.
+        // Önceki hatadan sonra yeni deneme devam edebilir
       }
     }
 
-    const syncPromise = this.connectWithTokenInternal(normalizedToken, sid);
-    this.syncPromises.set(sid, syncPromise);
-    this.syncTokens.set(sid, normalizedToken);
+    const syncPromise = this.connectWithTokenInternal(normalizedToken);
+    this.activeSyncPromise = syncPromise;
+    this.activeSyncToken = normalizedToken;
     try {
       return await syncPromise;
     } finally {
-      if (this.syncPromises.get(sid) === syncPromise) {
-        this.syncPromises.delete(sid);
-        this.syncTokens.delete(sid);
+      if (this.activeSyncPromise === syncPromise) {
+        this.activeSyncPromise = null;
+        this.activeSyncToken = null;
       }
     }
   }
 
-  private static async connectWithTokenInternal(token: string, sid: string): Promise<{ sessionId: string, state: GitHubStoreState }> {
-    const state = this.getState(sid);
+  private static async connectWithTokenInternal(token: string): Promise<GitHubStoreState> {
+    const state = this.getState();
     const normalizedToken = token.trim();
     if (!normalizedToken) {
       throw new Error('GitHub token alanı zorunludur.');
@@ -291,7 +380,6 @@ export class GitHubService {
     state.syncError = undefined;
     state.telemetryStatus = this.createTelemetryStatus('syncing');
     state.lastSyncAttemptAt = Date.now();
-    this.sessions.set(sid, state);
 
     try {
       const headers = {
@@ -301,7 +389,15 @@ export class GitHubService {
       };
 
       // 1. Kullanıcı profilini getir
-      const ghUser = await this.fetchJson<any>('https://api.github.com/user', headers);
+      const ghUser = await this.fetchJson<{
+        id: number | string;
+        login: string;
+        name?: string;
+        avatar_url: string;
+        html_url: string;
+        bio?: string;
+        public_repos?: number;
+      }>('https://api.github.com/user', headers);
       const authenticatedLogin = String(ghUser.login || '').trim().toLowerCase();
       if (!authenticatedLogin) {
         throw new Error('GitHub hesabı bilgisi alınamadı.');
@@ -317,12 +413,12 @@ export class GitHubService {
       };
 
       // 2. Depoları getir
-      const allFetchedRepos: any[] = [];
+      const allFetchedRepos: GitHubApiRepo[] = [];
       let page = 1;
       let hasMore = true;
 
       while (hasMore) {
-        const pageRepos = await this.fetchJson<any[]>(
+        const pageRepos = await this.fetchJson<GitHubApiRepo[]>(
           `https://api.github.com/user/repos?sort=updated&direction=desc&per_page=100&page=${page}&affiliation=owner`,
           headers,
         );
@@ -347,13 +443,13 @@ export class GitHubService {
         seenIds.add(String(r.id));
         return true;
       });
-      const personalRepos = uniqueRepos.filter((repo: any) => {
+      const personalRepos = uniqueRepos.filter((repo: GitHubApiRepo) => {
         const ownerLogin = String(repo?.owner?.login || repo?.full_name?.split('/')?.[0] || '').trim().toLowerCase();
         const ownerType = String(repo?.owner?.type || '').trim().toLowerCase();
         return ownerLogin === authenticatedLogin && (!ownerType || ownerType === 'user');
       });
 
-      state.repositories = personalRepos.map((r: any) => ({
+      state.repositories = personalRepos.map((r: GitHubApiRepo) => ({
         id: `repo_${r.id}`,
         name: r.name,
         full_name: r.full_name,
@@ -371,15 +467,14 @@ export class GitHubService {
       }));
 
       // 3. Telemetri verilerini çek
-      await this.fetchRepositoryTelemetry(sid);
+      await this.fetchRepositoryTelemetry();
 
       state.lastSyncAt = new Date().toISOString();
       state.isSyncing = false;
       state.syncStatus = state.telemetryStatus.status === 'partial' ? 'partial' : 'ready';
       state.syncError = state.telemetryStatus.lastError;
-      this.sessions.set(sid, state);
       
-      return { sessionId: sid, state };
+      return state;
     } catch (err: any) {
       if (previousState.token) state.token = previousState.token;
       else delete state.token;
@@ -393,20 +488,18 @@ export class GitHubService {
       state.syncStatus = 'error';
       state.syncError = err?.message || 'GitHub bağlantısı sırasında hata oluştu.';
       state.telemetryStatus = previousState.telemetryStatus;
-      this.sessions.set(sid, state);
       console.error('Canlı GitHub verisi senkronize edilirken hata:', err?.message || err);
       throw err;
     }
   }
 
-  private static async fetchRepositoryTelemetry(sessionId: string): Promise<void> {
-    const state = this.getState(sessionId);
+  private static async fetchRepositoryTelemetry(): Promise<void> {
+    const state = this.getState();
     if (!state.token) {
       state.commits = [];
       state.pullRequests = [];
       state.issues = [];
       state.telemetryStatus = this.createTelemetryStatus('no_data');
-      this.sessions.set(sessionId, state);
       return;
     }
     
@@ -416,7 +509,6 @@ export class GitHubService {
       state.pullRequests = [];
       state.issues = [];
       state.telemetryStatus = this.createTelemetryStatus('no_data');
-      this.sessions.set(sessionId, state);
       return;
     }
 
@@ -428,7 +520,6 @@ export class GitHubService {
     let completedRepositories = 0;
 
     state.telemetryStatus = this.createTelemetryStatus('syncing', selectedRepos.length);
-    this.sessions.set(sessionId, state);
 
     const headers = {
       Authorization: `Bearer ${state.token}`,
@@ -439,7 +530,7 @@ export class GitHubService {
     const asNonNegativeNumber = (value: unknown): number => {
       return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
     };
-    const sinceTimestamp = Date.now() - TELEMETRY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const sinceTimestamp = Date.now() - TELEMETRY_WINDOW_DAYS * MS_PER_DAY;
     const since = new Date(sinceTimestamp).toISOString();
 
     const CHUNK_SIZE = 5;
@@ -453,7 +544,7 @@ export class GitHubService {
 
           try {
             // Commitleri getir
-            const ghCommits = await this.fetchJson<any[]>(
+            const ghCommits = await this.fetchJson<GitHubApiCommitSummary[]>(
               `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/commits?per_page=30&since=${encodeURIComponent(since)}`,
               headers
             );
@@ -461,28 +552,28 @@ export class GitHubService {
               throw new Error(`${repo.name} commit listesi beklenen formatta dönmedi.`);
             }
 
-            const commitRecords: { summary: any; detail: any }[] = [];
+            const commitRecords: { summary: GitHubApiCommitSummary; detail: GitHubApiCommitDetail }[] = [];
             const COMMIT_DETAIL_CHUNK_SIZE = 5;
             for (let commitIndex = 0; commitIndex < ghCommits.length; commitIndex += COMMIT_DETAIL_CHUNK_SIZE) {
               const commitChunk = ghCommits.slice(commitIndex, commitIndex + COMMIT_DETAIL_CHUNK_SIZE);
-              const detailedChunk = await Promise.all(commitChunk.map(async (summary: any) => {
+              const detailedChunk = await Promise.all(commitChunk.map(async (summary: GitHubApiCommitSummary) => {
                 const sha = summary?.sha;
-                if (!sha) return { summary, detail: summary };
+                if (!sha) return { summary, detail: summary as GitHubApiCommitDetail };
 
                 // Önbellekten kontrol et
                 if (this.commitDetailCache.has(sha)) {
-                  return { summary, detail: this.commitDetailCache.get(sha) };
+                  return { summary, detail: this.commitDetailCache.get(sha)! };
                 }
 
                 try {
-                  const detail = await this.fetchJson<any>(
+                  const detail = await this.fetchJson<GitHubApiCommitDetail>(
                     `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/commits/${encodeURIComponent(sha)}`,
                     headers
                   );
                   this.commitDetailCache.set(sha, detail);
                   return { summary, detail };
                 } catch {
-                  return { summary, detail: summary };
+                  return { summary, detail: summary as GitHubApiCommitDetail };
                 }
               }));
               commitRecords.push(...detailedChunk);
@@ -495,16 +586,14 @@ export class GitHubService {
               if (typeof sha !== 'string' || !sha || typeof commitDate !== 'string' || Number.isNaN(new Date(commitDate).getTime())) {
                 return;
               }
-              const lower = msg.toLowerCase();
-              const isBugFix = lower.includes('fix') || lower.includes('bug') || lower.includes('patch') || lower.includes('resolve') || lower.includes('issue') || lower.includes('hata');
               const rawFiles = Array.isArray(detail?.files)
                 ? detail.files
                 : Array.isArray(summary?.files)
                   ? summary.files
                   : [];
               const files = rawFiles
-                .filter((file: any) => typeof file?.filename === 'string')
-                .map((file: any) => ({
+                .filter((file: GitHubApiCommitFile) => typeof file?.filename === 'string')
+                .map((file: GitHubApiCommitFile) => ({
                   filename: file.filename,
                   additions: asNonNegativeNumber(file.additions),
                   deletions: asNonNegativeNumber(file.deletions),
@@ -531,45 +620,45 @@ export class GitHubService {
                 files_changed: files.length,
                 affected_files: files.map((file) => file.filename),
                 files,
-                is_bug_fix: isBugFix,
+                is_bug_fix: false, // Gemini yapay zekası anlamsal olarak sınıflandıracaktır
                 repo_name: repo.name,
               });
             });
 
             // Pull Request'leri getir
-            const ghPRs = await this.fetchJson<any[]>(
+            const ghPRs = await this.fetchJson<GitHubApiPRSummary[]>(
               `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/pulls?state=all&sort=updated&direction=desc&per_page=30`,
               headers
             );
             if (!Array.isArray(ghPRs)) {
               throw new Error(`${repo.name} PR listesi beklenen formatta dönmedi.`);
             }
-            const relevantPRs = ghPRs.filter((pr: any) => {
+            const relevantPRs = ghPRs.filter((pr: GitHubApiPRSummary) => {
               if (String(pr?.state || '').toLowerCase() === 'open') return true;
               const updatedTime = new Date(pr?.updated_at || pr?.created_at || '').getTime();
               return Number.isFinite(updatedTime) && updatedTime >= sinceTimestamp;
             });
-            const prRecords: { summary: any; detail: any }[] = [];
+            const prRecords: { summary: GitHubApiPRSummary; detail: GitHubApiPRDetail }[] = [];
             const PR_DETAIL_CHUNK_SIZE = 5;
             for (let prIndex = 0; prIndex < relevantPRs.length; prIndex += PR_DETAIL_CHUNK_SIZE) {
               const prChunk = relevantPRs.slice(prIndex, prIndex + PR_DETAIL_CHUNK_SIZE);
-              const detailedChunk = await Promise.all(prChunk.map(async (summary: any) => {
+              const detailedChunk = await Promise.all(prChunk.map(async (summary: GitHubApiPRSummary) => {
                 const prNumber = summary?.number;
                 const prKey = `${owner}/${repoName}#${prNumber}`;
                 if (this.prDetailCache.has(prKey)) {
-                  return { summary, detail: this.prDetailCache.get(prKey) };
+                  return { summary, detail: this.prDetailCache.get(prKey)! };
                 }
                 try {
                   const detail = prNumber
-                    ? await this.fetchJson<any>(
+                    ? await this.fetchJson<GitHubApiPRDetail>(
                         `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/pulls/${prNumber}`,
                         headers
                       )
                     : null;
                   if (detail) this.prDetailCache.set(prKey, detail);
-                  return { summary, detail: detail || summary };
+                  return { summary, detail: detail || (summary as GitHubApiPRDetail) };
                 } catch {
-                  return { summary, detail: summary };
+                  return { summary, detail: summary as GitHubApiPRDetail };
                 }
               }));
               prRecords.push(...detailedChunk);
@@ -589,7 +678,7 @@ export class GitHubService {
               const createdTime = new Date(createdAt).getTime();
               const closedTime = closedAt ? new Date(closedAt).getTime() : Number.NaN;
               const cycleTimeHours = Number.isFinite(createdTime) && Number.isFinite(closedTime)
-                ? Math.max(1, Math.round((closedTime - createdTime) / (1000 * 60 * 60)))
+                ? Math.max(1, Math.round((closedTime - createdTime) / MS_PER_HOUR))
                 : undefined;
 
               allPRs.push({
@@ -611,26 +700,26 @@ export class GitHubService {
                 // Bu nedenle yalnızca gerçek created -> closed/merged çevrimini sakla.
                 cycle_time_hours: cycleTimeHours,
                 repo_name: repo.name,
-                is_stale: prState === 'open' && Number.isFinite(createdTime) && (Date.now() - createdTime) > 1000 * 60 * 60 * 24 * 7,
+                is_stale: prState === 'open' && Number.isFinite(createdTime) && (Date.now() - createdTime) > STALE_PR_THRESHOLD_DAYS * MS_PER_DAY,
               });
             });
 
             // Issues'ları getir
-            const ghIssues = await this.fetchJson<any[]>(
+            const ghIssues = await this.fetchJson<GitHubApiIssue[]>(
               `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/issues?state=all&sort=updated&direction=desc&per_page=30`,
               headers
             );
             if (!Array.isArray(ghIssues)) {
               throw new Error(`${repo.name} issue listesi beklenen formatta dönmedi.`);
             }
-            const relevantIssues = ghIssues.filter((issue: any) => {
+            const relevantIssues = ghIssues.filter((issue: GitHubApiIssue) => {
               if (String(issue?.state || '').toLowerCase() === 'open') return true;
               const updatedTime = new Date(issue?.updated_at || issue?.created_at || '').getTime();
               return Number.isFinite(updatedTime) && updatedTime >= sinceTimestamp;
             });
-            relevantIssues.forEach((i: any) => {
+            relevantIssues.forEach((i: GitHubApiIssue) => {
               if (i.pull_request) return;
-              const isBug = (i.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('bug') || (l.name || '').toLowerCase().includes('hata'));
+              const isBug = (i.labels || []).some((l: { name?: string }) => (l.name || '').toLowerCase().includes('bug') || (l.name || '').toLowerCase().includes('hata'));
               const createdAt = i.created_at;
               if (typeof createdAt !== 'string' || Number.isNaN(new Date(createdAt).getTime())) {
                 return;
@@ -646,14 +735,14 @@ export class GitHubService {
                 created_at: createdAt,
                 closed_at: i.closed_at,
                 comments_count: asNonNegativeNumber(i.comments),
-                labels: (i.labels || []).map((l: any) => l.name || 'sorun'),
+                labels: (i.labels || []).map((l: { name?: string }) => l.name || 'sorun'),
                 repo_name: repo.name,
-                is_stale: i.state === 'open' && Number.isFinite(createdTime) && (Date.now() - createdTime) > 1000 * 60 * 60 * 24 * STALE_ISSUE_THRESHOLD_DAYS,
+                is_stale: i.state === 'open' && Number.isFinite(createdTime) && (Date.now() - createdTime) > STALE_ISSUE_THRESHOLD_DAYS * MS_PER_DAY,
                 is_bug: isBug,
               });
             });
-          } catch (repoErr: any) {
-            const message = repoErr?.message || 'Bilinmeyen GitHub telemetri hatası.';
+          } catch (repoErr: unknown) {
+            const message = repoErr instanceof Error ? repoErr.message : 'Bilinmeyen GitHub telemetri hatası.';
             failedRepositoryNames.push(repo.name);
             errors.push(`${repo.name}: ${message}`);
             console.warn(`${repo.name} için telemetri uyarısı:`, message);
@@ -666,10 +755,27 @@ export class GitHubService {
               failedRepositoryNames,
               errors[0],
             );
-            this.sessions.set(sessionId, state);
           }
         })
       );
+    }
+
+    // Gemini destekli anlamsal commit sınıflandırması (Toplu batch işleme & SHA immutability cache)
+    if (allCommits.length > 0) {
+      try {
+        const semanticMap = await CommitSemanticClassifier.classifyCommits(allCommits);
+        for (const commit of allCommits) {
+          const analysis = semanticMap.get(commit.sha);
+          if (analysis) {
+            commit.is_bug_fix = analysis.isBugFix;
+            commit.ai_category = analysis.category;
+            commit.ai_reasoning = analysis.reasoning;
+            commit.ai_confidence = analysis.confidence;
+          }
+        }
+      } catch (classifierErr) {
+        console.warn('Commit anlamsal sınıflandırma uyarısı:', classifierErr);
+      }
     }
 
     state.commits = allCommits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -682,15 +788,32 @@ export class GitHubService {
       failedRepositoryNames,
       errors[0],
     );
-    
-    this.sessions.set(sessionId, state);
   }
 
-  public static async toggleRepoSelection(sessionId: string, repoId: string): Promise<Repository[]> {
-    const state = this.getState(sessionId);
+  public static async toggleRepoSelection(repoId: string): Promise<Repository[]> {
+    if (this.activeSyncPromise) {
+      await this.activeSyncPromise;
+    }
+    if (this.activeTogglePromise) {
+      await this.activeTogglePromise;
+    }
+
+    const togglePromise = this.toggleRepoSelectionInternal(repoId);
+    this.activeTogglePromise = togglePromise;
+    try {
+      return await togglePromise;
+    } finally {
+      if (this.activeTogglePromise === togglePromise) {
+        this.activeTogglePromise = null;
+      }
+    }
+  }
+
+  private static async toggleRepoSelectionInternal(repoId: string): Promise<Repository[]> {
+    const state = this.getState();
     const targetRepo = state.repositories.find((repository) => repository.id === repoId);
     if (!targetRepo) {
-      const error = new Error('Seçilmeye çalışılan depo bu session içinde bulunamadı.') as Error & { status?: number };
+      const error = new Error('Seçilmeye çalışılan depo bulunamadı.') as Error & { status?: number };
       error.status = 404;
       throw error;
     }
@@ -698,22 +821,20 @@ export class GitHubService {
     state.repositories = state.repositories.map((r) =>
       r.id === repoId ? { ...r, selected_for_analysis: !r.selected_for_analysis } : r
     );
-    this.sessions.set(sessionId, state);
     if (state.repositories.some((repository) => repository.id === repoId && repository.selected_for_analysis)) {
       state.isSyncing = true;
       state.syncStatus = 'syncing';
       state.syncError = undefined;
       try {
-        await this.fetchRepositoryTelemetry(sessionId);
+        await this.fetchRepositoryTelemetry();
         state.isSyncing = false;
         state.syncStatus = state.telemetryStatus.status === 'partial' ? 'partial' : 'ready';
         state.syncError = state.telemetryStatus.lastError;
         state.lastSyncAt = new Date().toISOString();
-      } catch (err: any) {
+      } catch (err: unknown) {
         state.isSyncing = false;
         state.syncStatus = 'error';
-        state.syncError = err?.message || 'Depo telemetrisi alınamadı.';
-        this.sessions.set(sessionId, state);
+        state.syncError = err instanceof Error ? err.message : 'Depo telemetrisi alınamadı.';
         throw err;
       }
     } else {
@@ -740,17 +861,14 @@ export class GitHubService {
       state.syncStatus = state.telemetryStatus.status === 'partial' ? 'partial' : 'ready';
       state.syncError = state.telemetryStatus.lastError;
     }
-    this.sessions.set(sessionId, state);
-    return this.getState(sessionId).repositories;
+    return this.getState().repositories;
   }
 
-  public static async ensureSynced(_sessionId: string = 'default'): Promise<GitHubStoreState> {
-    const canonicalSid = 'default';
-    const state = this.getState(canonicalSid);
-    const runningSync = this.syncPromises.get(canonicalSid);
-    if (runningSync) {
-      await runningSync;
-      return this.getState(canonicalSid);
+  public static async ensureSynced(): Promise<GitHubStoreState> {
+    const state = this.getState();
+    if (this.activeSyncPromise) {
+      await this.activeSyncPromise;
+      return this.getState();
     }
 
     if (state.syncStatus === 'ready' || state.syncStatus === 'partial') {
@@ -759,36 +877,35 @@ export class GitHubService {
 
     const token = state.token || process.env.GITHUB_TOKEN;
     if (token) {
-      return this.syncRepositories(canonicalSid);
+      return this.syncRepositories();
     }
 
     state.syncStatus = 'no_data';
     state.telemetryStatus = this.createTelemetryStatus('no_data');
-    this.sessions.set(canonicalSid, state);
     return state;
   }
 
-  public static async syncRepositories(_sessionId: string = 'default'): Promise<GitHubStoreState> {
-    const canonicalSid = 'default';
-    const state = this.getState(canonicalSid);
+  public static async syncRepositories(): Promise<GitHubStoreState> {
+    if (this.activeSyncPromise) {
+      return this.activeSyncPromise;
+    }
+    const state = this.getState();
     const token = state.token || process.env.GITHUB_TOKEN;
     if (token) {
-      await this.connectWithToken(token, canonicalSid);
-    } else {
-      state.syncStatus = 'no_data';
-      state.syncError = undefined;
-      state.telemetryStatus = this.createTelemetryStatus('no_data');
-      this.sessions.set(canonicalSid, state);
+      return this.connectWithToken(token);
     }
-    return this.getState(canonicalSid);
+    state.syncStatus = 'no_data';
+    state.syncError = undefined;
+    state.telemetryStatus = this.createTelemetryStatus('no_data');
+    return state;
   }
 
   /**
    * DRY Yardımcısı: Analiz için seçilmiş depoları, filtrelenmiş commit, PR ve issue'ları,
    * hesaplanmış hotspot, risk ve sağlık skorlarını tek merkezden döner.
    */
-  public static async getActiveTelemetryContext(_sessionId: string = 'default') {
-    const state = await this.ensureSynced('default');
+  public static async getActiveTelemetryContext() {
+    const state = await this.ensureSynced();
     const activeRepos = state.repositories.filter((r) => r.selected_for_analysis);
     const activeRepoNames = new Set(activeRepos.map((r) => r.name));
     const commits = state.commits.filter((c) => activeRepoNames.has(c.repo_name));

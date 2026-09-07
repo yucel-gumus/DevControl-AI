@@ -15,19 +15,6 @@ const limiter = rateLimit({
 });
 router.use(limiter);
 
-// Session Middleware
-export interface SessionRequest extends Request {
-  sessionId?: string;
-}
-
-export const sessionMiddleware = (req: SessionRequest, _res: Response, next: NextFunction) => {
-  const sessionId = (req.headers['x-session-id'] as string) || 'default';
-  req.sessionId = sessionId;
-  next();
-};
-
-router.use(sessionMiddleware);
-
 router.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'DevControl AI Mühendislik Zekası Platformu', version: '2026.8' });
 });
@@ -44,7 +31,7 @@ router.use((err: any, _req: Request, res: Response, next: NextFunction) => {
 
   const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 600
     ? err.status
-    : 502;
+    : 500;
   const message = err?.message || 'İstek işlenirken beklenmeyen bir hata oluştu.';
   console.error('API isteği işlenemedi:', message);
   res.status(status).json({ error: message });

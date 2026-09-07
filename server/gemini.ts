@@ -4,6 +4,7 @@ import { AI_REQUEST_TIMEOUT_MS, AI_TOTAL_TIMEOUT_MS } from './constants.js';
 let aiInstance: GoogleGenAI | null = null;
 
 export const GEMINI_MODEL_CHAIN = [
+  'gemini-3.8-flash',
   'gemini-3.7-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.6-flash',

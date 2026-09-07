@@ -94,7 +94,7 @@ export const OverviewView: React.FC<Props> = ({
                   AI Mühendislik Kimliği
                 </span>
                 <span className="text-[11px] text-[#4a3e3b] font-medium">
-                  Gemini Flash Analizi
+                  KENSAI Analizi
                 </span>
               </div>
               <h2 className="text-base font-bold text-[#231c1a] mt-0.5 tracking-tight">
@@ -104,18 +104,18 @@ export const OverviewView: React.FC<Props> = ({
           </div>
 
           {/* Hızlı Metrik Rozetleri */}
-          {persona && (
+          {persona && persona.productivityMetrics && (
             <div className="flex items-center gap-2 flex-wrap">
               <div className="px-2.5 py-1 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-xs font-bold text-[#231c1a] flex items-center gap-1.5 shadow-xs">
                 <Zap className="w-3.5 h-3.5 text-[#231c1a]" />
-                <span>{persona.productivityMetrics.weeklyCommitFrequency} commit/hf</span>
+                <span>{persona.productivityMetrics.weeklyCommitFrequency ?? 0} commit/hf</span>
               </div>
               <div className="px-2.5 py-1 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-xs font-bold text-[#231c1a] flex items-center gap-1.5 shadow-xs">
                 <Award className="w-3.5 h-3.5 text-[#231c1a]" />
-                <span>Hijyen: {persona.productivityMetrics.conventionalCommitHygiene}</span>
+                <span>Hijyen: {persona.productivityMetrics.conventionalCommitHygiene || 'Standart'}</span>
               </div>
               <div className="px-2.5 py-1 rounded-lg border border-[#a89997] bg-[#b9aba9]/40 text-xs font-bold text-[#231c1a] flex items-center gap-1.5">
-                <span>Saatler: {persona.productivityMetrics.dominantWorkingHours}</span>
+                <span>Saatler: {persona.productivityMetrics.dominantWorkingHours || 'Esnek'}</span>
               </div>
             </div>
           )}
@@ -137,7 +137,7 @@ export const OverviewView: React.FC<Props> = ({
                 <span>Tespit Edilen Güçlü Yönler</span>
               </span>
               <ul className="space-y-1">
-                {persona.superpowers.map((power, idx) => (
+                {(persona.superpowers || []).map((power, idx) => (
                   <li key={idx} className="text-xs text-[#4a3e3b] flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
                     <span className="font-medium">{power}</span>
@@ -153,7 +153,7 @@ export const OverviewView: React.FC<Props> = ({
                 <span>Mühendislik Tavsiyeleri</span>
               </span>
               <ul className="space-y-1">
-                {persona.growthAreas.map((area, idx) => (
+                {(persona.growthAreas || []).map((area, idx) => (
                   <li key={idx} className="text-xs text-[#4a3e3b] flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#4a3e3b] mt-1.5 shrink-0" />
                     <span className="font-medium">{area}</span>

@@ -1,5 +1,5 @@
 import { CommitMetric, PullRequestMetric, IssueMetric, Repository, HealthScoreDimensions, HealthScoreWeights, EngineeringHealthScore } from '../../src/types.js';
-import { SCORING_THRESHOLDS } from '../constants.js';
+import { SCORING_THRESHOLDS, MS_PER_DAY } from '../constants.js';
 
 export const DEFAULT_WEIGHTS: HealthScoreWeights = {
   codeHealth: 0.25,
@@ -114,7 +114,7 @@ export class HealthEngine {
       delivery = Math.max(35, Math.min(96, Math.round(delivery)));
     } else if (hasCommitData) {
       // Kişisel Geliştirici Teslimat Ritmi: Son 14 gündeki commit frekansı ve ritmi
-      const recentCommits = commits.filter((c) => (Date.now() - new Date(c.date).getTime()) < 14 * 24 * 60 * 60 * 1000).length;
+      const recentCommits = commits.filter((c) => (Date.now() - new Date(c.date).getTime()) < 14 * MS_PER_DAY).length;
       delivery = Math.max(55, Math.min(95, Math.round(65 + (recentCommits * 1.5))));
     }
 

@@ -16,6 +16,7 @@ export interface Repository {
   description: string;
   language: string;
   is_private: boolean;
+  private?: boolean;
   default_branch: string;
   stargazers_count: number;
   forks_count: number;
@@ -25,6 +26,23 @@ export interface Repository {
   selected_for_analysis: boolean;
   health_score?: number;
   risk_level?: 'HEALTHY' | 'NEEDS_ATTENTION' | 'AT_RISK' | 'CRITICAL';
+}
+
+export type CommitCategory =
+  | 'BUG_FIX'
+  | 'FEATURE'
+  | 'REFACTOR'
+  | 'PERFORMANCE'
+  | 'SECURITY'
+  | 'DOCUMENTATION'
+  | 'CHORE';
+
+export interface CommitSemanticAnalysis {
+  sha: string;
+  isBugFix: boolean;
+  category: CommitCategory;
+  reasoning?: string;
+  confidence?: number;
 }
 
 export interface CommitMetric {
@@ -40,6 +58,9 @@ export interface CommitMetric {
   total_changes: number;
   files_changed: number;
   is_bug_fix: boolean;
+  ai_category?: CommitCategory;
+  ai_reasoning?: string;
+  ai_confidence?: number;
   repo_name: string;
   affected_files?: string[];
   files?: { filename?: string; path?: string; additions?: number; deletions?: number }[];
@@ -287,6 +308,7 @@ export interface AskAiMessage {
   content: string;
   timestamp: string;
   trace?: AnalysisTrace;
+  toolInvocations?: { toolName: string }[];
   evidence?: {
     metric: string;
     value: string | number;

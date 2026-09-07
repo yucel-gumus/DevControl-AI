@@ -1,7 +1,7 @@
 import { ToolRegistry, ToolExecutionContext } from '../toolRegistry.js';
 import { generateGeminiText } from '../gemini.js';
 import { HealthEngine } from '../metrics/healthEngine.js';
-import { AskAiMessage, AnalysisTrace, AnalysisTraceStep } from '../../src/types.js';
+import { AskAiMessage, AnalysisTrace, AnalysisTraceStep, Repository } from '../../src/types.js';
 
 export interface AgentExecutionResult {
   message: AskAiMessage;
@@ -58,62 +58,15 @@ export class AgentPlanner {
       selectedTools.push({ name: 'get_repository', args: { repo_name: matchedRepo.name } });
       selectedTools.push({ name: 'list_commits', args: { repo_name: matchedRepo.name, limit: 30 } });
       selectedTools.push({ name: 'list_pull_requests', args: { repo_name: matchedRepo.name, state: 'all' } });
-      selectedTools.push({ name: 'get_hotspots', args: {} });
-      selectedTools.push({ name: 'get_engineering_risks', args: {} });
-    } else if (
-      lowerQ.includes('risk') ||
-      lowerQ.includes('debt') ||
-      lowerQ.includes('borç') ||
-      lowerQ.includes('tehlike') ||
-      lowerQ.includes('darboğaz') ||
-      lowerQ.includes('uyarı') ||
-      lowerQ.includes('sorun')
-    ) {
-      selectedTools.push({ name: 'get_engineering_risks', args: {} });
-      selectedTools.push({ name: 'get_hotspots', args: { min_risk: 'HIGH' } });
-    } else if (
-      lowerQ.includes('hotspot') ||
-      lowerQ.includes('sıcak') ||
-      lowerQ.includes('dosya') ||
-      lowerQ.includes('file') ||
-      lowerQ.includes('churn') ||
-      lowerQ.includes('değişim') ||
-      lowerQ.includes('volatility')
-    ) {
-      selectedTools.push({ name: 'get_hotspots', args: {} });
-    } else if (
-      lowerQ.includes('health') ||
-      lowerQ.includes('score') ||
-      lowerQ.includes('sağlık') ||
-      lowerQ.includes('skor') ||
-      lowerQ.includes('puan') ||
-      lowerQ.includes('kalite')
-    ) {
-      selectedTools.push({ name: 'get_health_breakdown', args: {} });
-    } else if (
-      lowerQ.includes('pr') ||
-      lowerQ.includes('pull request') ||
-      lowerQ.includes('delivery') ||
-      lowerQ.includes('teslimat') ||
-      lowerQ.includes('merge')
-    ) {
-      selectedTools.push({ name: 'list_pull_requests', args: { state: 'all' } });
-    } else if (
-      lowerQ.includes('commit') ||
-      lowerQ.includes('activity') ||
-      lowerQ.includes('aktivite') ||
-      lowerQ.includes('hız') ||
-      lowerQ.includes('velocity') ||
-      lowerQ.includes('yazar') ||
-      lowerQ.includes('geliştirici')
-    ) {
-      selectedTools.push({ name: 'list_commits', args: { limit: 30 } });
-      selectedTools.push({ name: 'get_health_breakdown', args: {} });
+      selectedTools.push({ name: 'get_hotspots', args: { repo_name: matchedRepo.name } });
+      selectedTools.push({ name: 'get_engineering_risks', args: { repo_name: matchedRepo.name } });
     } else {
-      // Genel bakış sorgusu
+      // Tüm sisteme yönelik çok boyutlu telemetri araçları
       selectedTools.push({ name: 'get_health_breakdown', args: {} });
       selectedTools.push({ name: 'get_engineering_risks', args: {} });
       selectedTools.push({ name: 'get_hotspots', args: {} });
+      selectedTools.push({ name: 'list_commits', args: { limit: 30 } });
+      selectedTools.push({ name: 'list_pull_requests', args: { state: 'all' } });
     }
 
     const planDuration = Math.max(1, Date.now() - (startTime + step1Duration));
@@ -229,14 +182,17 @@ KULLANICI SORUSU: "${question}"
 SAĞLANAN YAPILANDIRILMIŞ TELEMETRİ VERİLERİ:
 ${JSON.stringify(compactProjection, null, 2)}`;
 
-    // Telemetri yoksa Gemini'den metin üretme; bu durumda model, veri varmış gibi
-    // yorum yapabilir. Deterministik no-data yanıtı kullanıcıya doğru durumu verir.
-    const aiAnswer = queryHasTelemetry ? await generateGeminiText(prompt) : null;
-
-    if (aiAnswer) {
-      assistantText = aiAnswer;
+    if (!queryHasTelemetry) {
+      assistantText = matchedRepo
+        ? `### 📡 \`${matchedRepo.name}\` için GitHub Telemetrisi Bekleniyor\n\n\`${matchedRepo.name}\` deposu bağlı olsa da analiz penceresinde bu depoya ait doğrulanmış commit, PR veya issue kaydı bulunmuyor. Sağlık skoru ve risk analizi üretmek için lütfen GitHub verilerini yeniden eşitleyin.`
+        : `### 📡 GitHub Telemetrisi Bekleniyor\n\nHenüz doğrulanmış GitHub commit, PR veya issue verisi bulunmuyor. Sağlık skoru, sıcak nokta ve risk analizi üretmek için lütfen **Depolar & Bağlantı** bölümünden GitHub hesabınızı bağlayın ve verileri eşitleyin.`;
     } else {
-      assistantText = AgentPlanner.generateDeterministicAnswer(question, compactProjection, context, matchedRepo);
+      const aiAnswer = await generateGeminiText(prompt);
+      if (aiAnswer) {
+        assistantText = aiAnswer;
+      } else {
+        assistantText = AgentPlanner.generateTelemetryFallback(context, matchedRepo);
+      }
     }
 
     // Hedef depoya veya genel sonuçlara göre olguları ve kanıtları topla
@@ -353,176 +309,38 @@ ${JSON.stringify(compactProjection, null, 2)}`;
   }
 
   /**
-   * Çevrimdışı veya aşırı yüklenme durumlarında çalışan akıllı deterministik analiz motoru
+   * Gemini servisine erişilemediğinde ham ve doğrulanmış telemetri verilerini şeffaf bir şekilde sunar
    */
-  private static generateDeterministicAnswer(
-    question: string,
-    data: any,
-    context?: ToolExecutionContext,
-    matchedRepo?: any
+  private static generateTelemetryFallback(
+    context: ToolExecutionContext,
+    matchedRepo?: Repository
   ): string {
-    const q = question.toLowerCase();
-    const repos = data.izlenenDepolar || [];
-    const topHotspots = context?.hotspots || [];
-    const topRisks = context?.risks || [];
-    const health = context?.healthScore;
+    const topHotspots = context.hotspots || [];
+    const topRisks = context.risks || [];
+    const health = context.healthScore;
 
-    const hasTelemetry = Boolean(
-      health?.hasData &&
-      ((context?.commits?.length || 0) > 0 ||
-        (context?.pullRequests?.length || 0) > 0 ||
-        (context?.issues?.length || 0) > 0)
-    );
-
-    if (!hasTelemetry) {
-      return `### 📡 GitHub Telemetrisi Bekleniyor
-
-Henüz doğrulanmış GitHub commit, PR veya issue verisi bulunmuyor. Sağlık skoru, sıcak nokta ve risk analizi üretmek için önce **Depolar & Bağlantı** bölümünden GitHub hesabınızı bağlayın ve verileri eşitleyin.
-
-Bu aşamada herhangi bir skor, dosya adı veya risk tahmini üretilmedi.`;
-    }
-
-    // 1. Belirli bir depo sorulmuşsa doğrudan o depoya odaklı deterministik yanıt ver
     if (matchedRepo) {
-      const repoCommits = (context?.commits || []).filter((c) => c.repo_name.toLowerCase() === matchedRepo.name.toLowerCase());
+      const repoCommits = context.commits.filter((c) => c.repo_name.toLowerCase() === matchedRepo.name.toLowerCase());
       const repoHotspots = topHotspots.filter((h) => h.repo_name.toLowerCase() === matchedRepo.name.toLowerCase());
       const repoRisks = topRisks.filter((r) => r.affectedRepository.toLowerCase() === matchedRepo.name.toLowerCase() || (r.repo_name && r.repo_name.toLowerCase() === matchedRepo.name.toLowerCase()));
-      const repoPRs = (context?.pullRequests || []).filter((p) => p.repo_name.toLowerCase() === matchedRepo.name.toLowerCase());
-      const repoIssues = (context?.issues || []).filter((i) => i.repo_name.toLowerCase() === matchedRepo.name.toLowerCase());
-      const repoHealth = HealthEngine.calculateHealth([matchedRepo], repoCommits, repoPRs, repoIssues);
+      const repoPRs = context.pullRequests.filter((p) => p.repo_name.toLowerCase() === matchedRepo.name.toLowerCase());
 
-      if (!repoHealth.hasData) {
-        return `### 📡 \`${matchedRepo.name}\` için GitHub Telemetrisi Bekleniyor
+      return `### 📡 Doğrulanmış Telemetri Kaydı: \`${matchedRepo.name}\`
+*(Yapay zeka analiz motoruna şu anda ulaşılamadı. Depodan çekilen güncel telemetri kayıtları aşağıda listelenmiştir.)*
 
-\`${matchedRepo.name}\` deposu bağlı olsa da analiz penceresinde bu depoya ait doğrulanmış commit, PR veya issue kaydı bulunmuyor. Bu nedenle depo için sağlık skoru, sıcak nokta veya risk tahmini yapılmadı.
-
-Başka depolarda veri varsa genel analiz yapılabilir; bu depo için güncel kayıtları almak üzere GitHub verilerini yeniden eşitleyin.`;
-      }
-
-      return `### 🏛️ Mimari Sağlık Analizi: \`${matchedRepo.name}\`
-
-**Depo Sağlık Skoru:** **${repoHealth.overallScore} / 100** (${repoHealth.grade}) | **Risk Seviyesi:** ${matchedRepo.risk_level || 'hesaplanıyor'} | **Birincil Dil:** ${matchedRepo.language}
-
-#### 1. 📊 Doğrulanmış Telemetri Kanıtları
-• **İncelenen Commit Sayısı:** ${repoCommits.length}
-• **Çekme İstekleri (PR):** Toplam ${repoPRs.length} PR (${repoPRs.filter((p) => p.state === 'open').length} açık, ${repoPRs.filter((p) => p.state === 'merged').length} birleştirildi)
-• **Açık Hata/Sorun Bildirimi:** ${matchedRepo.open_issues_count} adet
-
-#### 2. ⚠️ Risk ve Sıcak Nokta (Hotspot) Durumu
-${
-  repoHotspots.length > 0
-    ? repoHotspots.map((h) => `• **\`${h.path}\`**: ${h.modifications_count} değişiklik, ${h.bug_fix_commits_count} hata düzeltmesi, ${h.code_churn.toLocaleString()} satır dalgalanma (${h.risk_level} risk).`).join('\n')
-    : '• Bu depoda kritik bir kod sıcak noktası veya aşırı dalgalanan modül tespit edilmedi. Kod tabanı kararlı bir mimari sınıra sahip.'
-}
-${
-  repoRisks.length > 0
-    ? '\n**Tespit Edilen Mimari Riskler:**\n' + repoRisks.map((r) => `• **[${r.severity}]**: ${r.title} — ${r.summary}`).join('\n')
-    : ''
-}
-
-#### 3. 🛠️ Önerilen Mühendislik Yol Haritası
-- **Modüler Güvenlik:** Sık değiştirilen işlevleri bağımsız yardımcı modüllere ayırarak tek sorumluluk prensibini koruyun.
-- **Otomasyon & Test:** Kritik akışlar için birim test kapsamını artırarak regresyon olasılıklarını asgariye indirin.`;
+• **İncelenen Commit Hacmi:** ${repoCommits.length} commit
+• **Çekme İstekleri (PR):** ${repoPRs.length} PR (${repoPRs.filter((p) => p.state === 'open').length} açık)
+• **Açık Sorun (Issue) Sayısı:** ${matchedRepo.open_issues_count}
+• **Tespit Edilen Sıcak Noktalar:** ${repoHotspots.length > 0 ? repoHotspots.map((h) => `\`${h.path}\` (${h.modifications_count} değişiklik, ${h.code_churn} satır)`).join(', ') : 'Kritik sıcak nokta tespit edilmedi.'}
+• **Aktif Riskler:** ${repoRisks.length > 0 ? repoRisks.map((r) => `[${r.severity}] ${r.title}`).join('; ') : 'Aktif risk bulunmuyor.'}`;
     }
 
-    // 2. Belirli bir riskten bahsedilmiş mi kontrol et
-    const matchedRisk = topRisks.find(
-      (r) =>
-        q.includes(r.title.toLowerCase()) ||
-        q.includes(r.affectedRepository.toLowerCase()) ||
-        (r.repo_name && q.includes(r.repo_name.toLowerCase()))
-    );
+    return `### 📡 Doğrulanmış Sistem Telemetri Kaydı
+*(Yapay zeka analiz motoruna şu anda ulaşılamadı. Doğrudan ölçülen sistem telemetri kayıtları aşağıda listelenmiştir.)*
 
-    if (matchedRisk) {
-      const evidenceStr = matchedRisk.evidence
-        .map((e) => `• **${e.metric}**: ${e.value} (${e.description})`)
-        .join('\n');
-      return `### 🔍 Doğrulanmış Risk Analizi: **${matchedRisk.title}**
-**Depo:** \`${matchedRisk.affectedRepository}\` | **Önem Seviyesi:** ${matchedRisk.severity} | **Güven Skoru:** %${matchedRisk.confidence}
-
-#### 1. Doğrudan Ölçülen Kanıtlar
-${evidenceStr || `• Ölçülen risk seviyesi: ${matchedRisk.severity}`}
-
-#### 2. Mühendislik Yorumu & Nedenler
-${matchedRisk.summary} Bu durum modül üzerindeki bağımlılık karmaşıklığından ve son dönemdeki yüksek kod değişim frekansından kaynaklanmaktadır.
-
-#### 3. Önerilen Aksiyon & Çözüm Planı
-- **Öncelikli Görev:** ${matchedRisk.recommendedAction}
-- **Sonraki Adım:** İlgili modül için birim test kapsamını artırın ve merge öncesi zorunlu akran denetimi (peer review) uygulayın.`;
-    }
-
-    // 3. Belirli bir sıcak noktadan bahsedilmiş mi kontrol et
-    const matchedHotspot = topHotspots.find((h) => {
-      if (!h || !h.path || typeof h.path !== 'string') return false;
-      const fileName = h.path.split('/').pop()?.toLowerCase() || '';
-      return q.includes(h.path.toLowerCase()) || (fileName && q.includes(fileName));
-    });
-
-    if (matchedHotspot) {
-      return `### ⚠️ Kod Sıcak Noktası Analizi: \`${matchedHotspot.repo_name}/${matchedHotspot.path}\`
-**Risk Seviyesi:** ${matchedHotspot.risk_level} | **Dil:** ${matchedHotspot.language} | **Güven:** %${matchedHotspot.confidence}
-
-#### 1. Doğrudan Ölçülen Kanıtlar
-• **Değişiklik Sayısı:** ${matchedHotspot.modifications_count} commit (${matchedHotspot.contributors_count} farklı geliştirici)
-• **Kod Değişimi (Churn):** ${matchedHotspot.code_churn.toLocaleString()} satır (+${matchedHotspot.lines_added} / -${matchedHotspot.lines_deleted})
-• **Hata Düzeltme (Bugfix) Sayısı:** ${matchedHotspot.bug_fix_commits_count} commit
-
-#### 2. Mimari Yorum
-Bu dosya sıkça değişmekte ve birden fazla sorumluluğu tek bir gövdede toplamaktadır. Kod tabanındaki en yüksek volatiliteye sahip çekirdek noktalardan biridir.
-
-#### 3. Önerilen Aksiyon
-${matchedHotspot.recommendation || 'Dosyayı daha küçük servis ve yardımcı modüllere ayırarak tek sorumluluk prensibini uygulayın.'}`;
-    }
-
-    if (q.includes('risk') || q.includes('danger') || q.includes('attention') || q.includes('borç') || q.includes('tehlike')) {
-      if (topRisks.length > 0) {
-        const riskBullets = topRisks
-          .slice(0, 3)
-          .map(
-            (r, i) =>
-              `${i + 1}. **[${r.severity}] \`${r.affectedRepository}\`**: ${r.title} — ${r.summary}`
-          )
-          .join('\n');
-        return `### 🚨 Tespit Edilen Öncelikli Mühendislik Riskleri
-
-${riskBullets}
-
-#### Önerilen Mühendislik Aksiyonu
-${topRisks[0]?.recommendedAction || 'Yüksek kod değişimine sahip modüllerde refactoring yaparak regresyon tehlikelerini azaltın.'}`;
-      }
-    }
-
-    if (q.includes('hotspot') || q.includes('file') || q.includes('churn') || q.includes('sıcak') || q.includes('dosya')) {
-      if (topHotspots.length > 0) {
-        const hotspotBullets = topHotspots
-          .slice(0, 3)
-          .map(
-            (h) =>
-              `- **\`${h.repo_name}/${h.path}\`**: ${h.modifications_count} commit, ${h.contributors_count} geliştirici, ${h.code_churn.toLocaleString()} satır değişim, ${h.bug_fix_commits_count} hata düzeltmesi (${h.risk_level} risk).`
-          )
-          .join('\n');
-        return `### 🔥 Tespit Edilen Kod Sıcak Noktaları (Hotspots)
-
-${hotspotBullets}
-
-Bu dosyalar sürekli değiştirilmekte olup yüksek hata ve regresyon potansiyeline sahiptir.`;
-      }
-    }
-
-    if (q.includes('health') || q.includes('score') || q.includes('sağlık') || q.includes('skor')) {
-      if (health) {
-        return `### 📊 Genel Mühendislik Sağlık Endeksi: **${health.overallScore} / 100** (Derece ${health.grade})
-
-- **Kod Sağlığı (Code Health):** ${health.dimensions.codeHealth}/100 — ${health.dimensions.codeHealth >= 80 ? 'Kararlı temel durum.' : 'Sıcak nokta dosyaları refactoring gerektiriyor.'}
-- **Teslimat (Delivery):** ${health.dimensions.delivery}/100 — PR döngü süreleri ve teslimat hızı.
-- **Dokümantasyon:** ${health.dimensions.documentation}/100 — API ve modül spesifikasyon kapsamı.
-- **Bakım (Maintenance):** ${health.dimensions.maintenance}/100 — Sorun çözümleme sıklığı.
-- **İşbirliği (Collaboration):** ${health.dimensions.collaboration}/100 — Dağıtık yazarlık ve akran inceleme katılımı.
-- **Aktivite (Activity):** ${health.dimensions.activity}/100 — Son 30 günlük commit hacmi.`;
-      }
-    }
-
-    const totalCommits = context?.commits?.length || 0;
-    return `İzlenen ${repos.length} depo genelinde son analiz penceresinde **${totalCommits} commit** incelenmiştir. Sistem, commit volatilitesini ve PR döngü sürelerini çapraz referanslayarak kod sıcak noktalarını ve operasyonel darboğazları sürekli raporlamaktadır.`;
+• **Genel Sağlık Skoru:** ${health?.hasData ? `${health.overallScore} / 100 (${health.grade})` : 'Hesaplanıyor'}
+• **Toplam İncelenen Commit:** ${context.commits.length} commit
+• **Toplam Tespit Edilen Sıcak Nokta:** ${topHotspots.length} dosya
+• **Aktif Mühendislik Riski:** ${topRisks.length} adet`;
   }
 }

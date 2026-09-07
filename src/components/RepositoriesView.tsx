@@ -1,62 +1,39 @@
 import React, { useState } from 'react';
 import {
-  FolderGit2,
   Search,
   ExternalLink,
   Lock,
   Globe,
   Sparkles,
-  Layers,
   X,
-  ShieldAlert,
   Brain,
   CheckCircle2,
   Calendar,
   AlertCircle,
-  FileText,
+  ShieldCheck,
 } from 'lucide-react';
-import { Repository, GitHubUser } from '../types.js';
+import { Repository, GitHubUser, RepoAiReview } from '../types.js';
 import { useRepoReview } from '../hooks/useMetrics.js';
 
 interface Props {
   repositories: Repository[];
-  hotspots?: any[];
   user: GitHubUser | null;
-  onToggleSelectRepo?: (repoId: string) => void;
-  onToggleRepo?: (repoId: any) => void;
+  onToggleRepo: (repoId: string) => void;
   onAskAboutRepo: (repoName: string) => void;
-  selectedRepo: Repository | null;
-  onSelectRepo: (repo: Repository | null) => void;
-  onSync: () => void;
-  syncStatus?: string;
-  syncError?: string | null;
-  telemetryStatus?: string;
-  isSyncing?: boolean;
-  rateLimitStatus?: any;
 }
 
 export const RepositoriesView: React.FC<Props> = ({
   repositories = [],
-  hotspots = [],
   user,
-  onToggleSelectRepo,
   onToggleRepo,
   onAskAboutRepo,
-  selectedRepo,
-  onSelectRepo,
-  onSync,
-  syncStatus,
-  syncError,
-  telemetryStatus,
-  isSyncing = false,
-  rateLimitStatus,
 }) => {
   const [search, setSearch] = useState('');
   const [filterLang, setFilterLang] = useState<string>('ALL');
 
   // AI İnceleme Modalı Durumu
   const [activeRepoForReview, setActiveRepoForReview] = useState<Repository | null>(null);
-  const [reviewResult, setReviewResult] = useState<any | null>(null);
+  const [reviewResult, setReviewResult] = useState<RepoAiReview | null>(null);
   const repoReviewMutation = useRepoReview();
 
   const handleTriggerReview = async (repo: Repository) => {
@@ -151,11 +128,10 @@ export const RepositoriesView: React.FC<Props> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
           <button
             onClick={() => setFilterLang('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              filterLang === 'ALL'
-                ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
-                : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${filterLang === 'ALL'
+              ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
+              : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
+              }`}
           >
             Tümü ({safeRepos.length})
           </button>
@@ -163,11 +139,10 @@ export const RepositoriesView: React.FC<Props> = ({
             <button
               key={lang}
               onClick={() => setFilterLang(lang)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                filterLang === lang
-                  ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
-                  : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${filterLang === lang
+                ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
+                : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
+                }`}
             >
               {lang}
             </button>
@@ -187,16 +162,15 @@ export const RepositoriesView: React.FC<Props> = ({
             return (
               <div
                 key={repo.id}
-                className={`p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 shadow-xs ${
-                  isSelected
-                    ? 'border-[#231c1a]/30 bg-[#cdc1b5]'
-                    : 'border-[#a89997] bg-[#cdc1b5]/80 hover:bg-[#cdc1b5]'
-                }`}
+                className={`p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 shadow-xs ${isSelected
+                  ? 'border-[#231c1a]/30 bg-[#cdc1b5]'
+                  : 'border-[#a89997] bg-[#cdc1b5]/80 hover:bg-[#cdc1b5]'
+                  }`}
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      {repo.private ? (
+                      {(repo.is_private ?? repo.private) ? (
                         <Lock className="w-3.5 h-3.5 text-[#4a3e3b] shrink-0" />
                       ) : (
                         <Globe className="w-3.5 h-3.5 text-[#4a3e3b] shrink-0" />
@@ -230,17 +204,11 @@ export const RepositoriesView: React.FC<Props> = ({
 
                   <div className="flex items-center justify-between gap-2">
                     <button
-                      onClick={() => {
-                        const toggleFn = onToggleSelectRepo || onToggleRepo;
-                        if (toggleFn) {
-                          toggleFn(String(repo.id));
-                        }
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
-                          : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
-                      }`}
+                      onClick={() => onToggleRepo(String(repo.id))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${isSelected
+                        ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
+                        : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
+                        }`}
                     >
                       {isSelected ? 'Analizde Dahil' : 'Analize Ekle'}
                     </button>
@@ -259,7 +227,7 @@ export const RepositoriesView: React.FC<Props> = ({
                         onClick={() => onAskAboutRepo(repo.name)}
                         className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer"
                       >
-                        AI Sor
+                        Kensai
                       </button>
                     </div>
                   </div>
@@ -295,9 +263,10 @@ export const RepositoriesView: React.FC<Props> = ({
                   setActiveRepoForReview(null);
                   setReviewResult(null);
                 }}
+                aria-label="İnceleme penceresini kapat"
                 className="p-1.5 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-[#231c1a] hover:brightness-105 cursor-pointer transition-all"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
 
@@ -308,7 +277,7 @@ export const RepositoriesView: React.FC<Props> = ({
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <p className="text-sm font-bold text-[#231c1a]">
-                  Gemini Flash depo telemetrisini ve commit geçmişini inceliyor...
+                  KENSAI depo telemetrisini ve commit geçmişini inceliyor...
                 </p>
                 <p className="text-xs text-[#4a3e3b]">
                   Mimari güçlü yönler, riskler ve 14 günlük aksiyon planı sentezleniyor
@@ -318,74 +287,145 @@ export const RepositoriesView: React.FC<Props> = ({
 
             {reviewResult && (
               <div className="space-y-4 text-xs leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
-                {/* Mimari Değerlendirme Özeti */}
-                <div className="p-4 rounded-xl border border-[#a89997] bg-[#b9aba9]/35 space-y-1.5 shadow-xs">
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 inline-block">
-                    Mimari Özet
-                  </span>
+                {/* Kalite Skoru ve Mimari Değerlendirme Özeti */}
+                <div className="p-4 rounded-xl border border-[#a89997] bg-[#b9aba9]/35 space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 inline-block">
+                      Mimari Özet
+                    </span>
+                    {reviewResult.codeQualityScore !== undefined && (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border border-[#231c1a]/15 bg-[#f9b88e] text-[#231c1a] shadow-xs">
+                        Kalite Skoru: {reviewResult.codeQualityScore} / 100
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-[#231c1a] font-medium leading-relaxed">
-                    {reviewResult.architecturalSummary}
+                    {reviewResult.architectureOverview || (reviewResult as any).architecturalSummary}
                   </p>
                 </div>
 
                 {/* Güçlü Yönler */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#231c1a]" />
-                    <span>Güçlü Yönler</span>
-                  </h4>
-                  <ul className="space-y-1.5">
-                    {reviewResult.strengths?.map((str: string, idx: number) => (
-                      <li
-                        key={idx}
-                        className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
-                        <span>{str}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {Array.isArray(reviewResult.strengths) && reviewResult.strengths.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                      <span>Güçlü Yönler</span>
+                    </h4>
+                    <ul className="space-y-1.5">
+                      {reviewResult.strengths.map((str: string, idx: number) => (
+                        <li
+                          key={idx}
+                          className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
+                          <span>{str}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-                {/* Kritik İyileştirme Alanları */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 text-[#231c1a]" />
-                    <span>İyileştirme Gereken Alanlar</span>
-                  </h4>
-                  <ul className="space-y-1.5">
-                    {reviewResult.weaknesses?.map((weak: string, idx: number) => (
-                      <li
-                        key={idx}
-                        className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#4a3e3b] mt-1.5 shrink-0" />
-                        <span>{weak}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {/* Kritik İyileştirme Alanları & Teknik Borçlar */}
+                {((reviewResult.technicalDebts && reviewResult.technicalDebts.length > 0) ||
+                  ((reviewResult as any).weaknesses && (reviewResult as any).weaknesses.length > 0)) && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                        <span>İyileştirme Gereken Alanlar & Teknik Borçlar</span>
+                      </h4>
+                      <ul className="space-y-1.5">
+                        {(reviewResult.technicalDebts || (reviewResult as any).weaknesses)?.map((debt: string, idx: number) => (
+                          <li
+                            key={idx}
+                            className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#4a3e3b] mt-1.5 shrink-0" />
+                            <span>{debt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                {/* 14 Günlük Aksiyon Planı */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#231c1a]" />
-                    <span>14 Günlük Mühendislik Aksiyon Planı</span>
-                  </h4>
-                  <ol className="space-y-1.5">
-                    {reviewResult.actionItemsNext14Days?.map((action: string, idx: number) => (
-                      <li
-                        key={idx}
-                        className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2.5 font-medium"
-                      >
-                        <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
-                          {idx + 1}
-                        </span>
-                        <span>{action}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
+                {/* Güvenlik Gözlemleri */}
+                {Array.isArray(reviewResult.securityObservations) && reviewResult.securityObservations.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                      <span>Güvenlik Gözlemleri</span>
+                    </h4>
+                    <ul className="space-y-1.5">
+                      {reviewResult.securityObservations.map((sec: string, idx: number) => (
+                        <li
+                          key={idx}
+                          className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
+                          <span>{sec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* 14 Günlük Mühendislik Aksiyon Planı / Yol Haritası */}
+                {((reviewResult.recommendedRoadmap && reviewResult.recommendedRoadmap.length > 0) ||
+                  ((reviewResult as any).actionItemsNext14Days && (reviewResult as any).actionItemsNext14Days.length > 0)) && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                        <span>14 Günlük Mühendislik Aksiyon Planı</span>
+                      </h4>
+                      <div className="space-y-2">
+                        {Array.isArray(reviewResult.recommendedRoadmap) ? (
+                          reviewResult.recommendedRoadmap.map((item, idx: number) => {
+                            const priority = item.priority || 'MEDIUM';
+                            const priorityBadge =
+                              priority === 'HIGH'
+                                ? 'bg-[#231c1a] text-[#f9b88e]'
+                                : priority === 'MEDIUM'
+                                  ? 'bg-[#f9b88e] text-[#231c1a]'
+                                  : 'bg-[#b9aba9] text-[#231c1a]';
+                            return (
+                              <div
+                                key={idx}
+                                className="p-3 rounded-xl border border-[#a89997] bg-[#b9aba9]/30 space-y-1 text-[#231c1a] shadow-xs"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-xs flex items-center gap-2">
+                                    <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                                      {idx + 1}
+                                    </span>
+                                    <span>{item.title}</span>
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border border-[#231c1a]/15 ${priorityBadge}`}>
+                                    {priority}
+                                  </span>
+                                </div>
+                                {item.description && (
+                                  <p className="text-[11px] text-[#4a3e3b] pl-6 font-medium leading-relaxed">
+                                    {item.description}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          (reviewResult as any).actionItemsNext14Days?.map((action: string, idx: number) => (
+                            <div
+                              key={idx}
+                              className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2.5 font-medium"
+                            >
+                              <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                                {idx + 1}
+                              </span>
+                              <span>{action}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                 {/* Alt Butonlar */}
                 <div className="pt-3 border-t border-[#a89997] flex justify-end gap-2">
