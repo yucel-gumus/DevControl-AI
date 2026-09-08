@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Terminal, Activity, Gauge } from 'lucide-react';
+import { RefreshCw, Terminal, Activity, Gauge, Database } from 'lucide-react';
 import { EngineeringHealthScore, RateLimitStatus } from '../types.js';
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   onOpenAskAi: () => void;
   isAskAiActive?: boolean;
   rateLimitStatus?: RateLimitStatus;
+  isCachedFromDb?: boolean;
 }
 
 export const Header: React.FC<Props> = ({
@@ -24,6 +25,7 @@ export const Header: React.FC<Props> = ({
   onOpenAskAi,
   isAskAiActive = false,
   rateLimitStatus,
+  isCachedFromDb = false,
 }) => {
   const isPartial = healthScore?.dataStatus === 'partial';
 
@@ -81,6 +83,17 @@ export const Header: React.FC<Props> = ({
           >
             <Gauge className="w-3 h-3 text-[#4a3e3b]" />
             <span>API: {rateLimitStatus.remaining.toLocaleString()}</span>
+          </div>
+        )}
+
+        {/* Firestore Önbellek Göstergesi */}
+        {isCachedFromDb && (
+          <div
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border border-[#a89997] bg-[#f9b88e]/60 text-[#231c1a]"
+            title="Veriler Firebase Firestore'daki kayıtlı snapshot'tan anında yüklendi. GitHub'dan canlı veri çekmek için Yenile butonuna basın."
+          >
+            <Database className="w-3 h-3 text-[#231c1a]" />
+            <span>DB Snapshot</span>
           </div>
         )}
 

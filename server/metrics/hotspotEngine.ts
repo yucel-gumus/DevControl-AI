@@ -30,12 +30,16 @@ export class HotspotEngine {
             }))
             .filter((file): file is { path: string; additions: number; deletions: number } => typeof file.path === 'string' && file.path.length > 0)
         : [];
+      const fileCount = Math.max(1, affectedFiles.length);
+      const perFileAdditions = Math.round((commit.additions || 0) / fileCount);
+      const perFileDeletions = Math.round((commit.deletions || 0) / fileCount);
+
       const files = detailedFiles.length > 0
         ? detailedFiles
         : affectedFiles.map((path) => ({
             path,
-            additions: affectedFiles.length === 1 ? Math.max(0, commit.additions || 0) : 0,
-            deletions: affectedFiles.length === 1 ? Math.max(0, commit.deletions || 0) : 0,
+            additions: perFileAdditions,
+            deletions: perFileDeletions,
           }));
 
       files.forEach(({ path, additions, deletions }) => {
@@ -69,7 +73,15 @@ export class HotspotEngine {
       });
     });
 
-    const hotspots: FileHotspot[] = Array.from(fileStats.values()).map((stat) => {
+    const realStats = Array.from(fileStats.values()).filter((stat) => {
+      const churn = stat.linesAdded + stat.linesDeleted;
+      // Kritik Hotspot Eşiği:
+      // En az 2 kez değişmiş OLMALI, VEYA en az 1 hata düzeltmesi almış OLMALI, VEYA anlamlı kod dalgalanması (>= 80 satır) geçirmiş OLMALI.
+      // Tek bir commit almış ve hiç hata/churn görmemiş sıradan dosyalar elenir.
+      return stat.modifications >= 2 || stat.bugFixes >= 1 || churn >= 80;
+    });
+
+    const hotspots: FileHotspot[] = realStats.map((stat) => {
       const churn = stat.linesAdded + stat.linesDeleted;
       const contributors = stat.authors.size;
 
@@ -77,24 +89,28 @@ export class HotspotEngine {
       let risk_level: FileHotspot['risk_level'] = 'LOW';
       let confidence = 85;
 
-      if (stat.modifications >= 10 || (stat.bugFixes >= 4 && churn > 1500)) {
+      if (stat.bugFixes >= 2 || stat.modifications >= 6 || (stat.bugFixes >= 1 && churn > 300)) {
         risk_level = 'CRITICAL';
-        confidence = 94;
-      } else if (stat.modifications >= 6 || stat.bugFixes >= 3 || churn > 1000) {
+        confidence = 95;
+      } else if (stat.bugFixes >= 1 || stat.modifications >= 3 || churn > 150) {
         risk_level = 'HIGH';
-        confidence = 91;
-      } else if (stat.modifications >= 3 || churn > 500) {
+        confidence = 90;
+      } else if (stat.modifications >= 2 || churn > 50) {
         risk_level = 'MEDIUM';
-        confidence = 88;
+        confidence = 85;
       }
 
       // Uzantıdan dili dinamik çıkar
       const ext = (stat.path && typeof stat.path === 'string') ? (stat.path.split('.').pop()?.toLowerCase() || '') : '';
+      const baseName = (stat.path && typeof stat.path === 'string') ? (stat.path.split('/').pop()?.toLowerCase() || '') : '';
+
       const languageMap: Record<string, string> = {
         ts: 'TypeScript',
         tsx: 'TypeScript (React)',
         js: 'JavaScript',
         jsx: 'JavaScript (React)',
+        mjs: 'JavaScript (ESM)',
+        cjs: 'JavaScript (CJS)',
         py: 'Python',
         rs: 'Rust',
         tf: 'HCL / Terraform',
@@ -112,8 +128,25 @@ export class HotspotEngine {
         json: 'JSON',
         yaml: 'YAML',
         yml: 'YAML',
+        md: 'Markdown Belge',
+        css: 'CSS Stil',
+        scss: 'SCSS Stil',
+        html: 'HTML Şablon',
+        sh: 'Shell Betiği',
+        bash: 'Bash Betiği',
+        xml: 'XML',
+        svg: 'SVG Vektör',
+        toml: 'TOML Yapılandırma',
+        dockerignore: 'Docker Kuralı',
+        gitignore: 'Git Kuralı',
       };
-      const language = languageMap[ext] || 'Kaynak Kod';
+
+      let language = languageMap[ext];
+      if (!language) {
+        if (baseName.includes('dockerfile')) language = 'Docker Konfigürasyonu';
+        else if (baseName.startsWith('.env')) language = 'Ortam Değişkenleri';
+        else language = 'Kaynak Kod';
+      }
 
       // Dosya yoluna, rolüne ve metriklerine göre dinamik çözüm önerisi üret
       const lowerPath = stat.path.toLowerCase();
@@ -133,42 +166,52 @@ export class HotspotEngine {
         recommendation = `Birden fazla geliştirici (${contributors} kişi) bu dosyayı düzenlediğinden, birleştirme çakışmalarını önlemek için kod tabanını modülerleştirin.`;
       }
 
-      return {
-        path: stat.path,
-        repo_name: stat.repo_name,
-        language,
-        modifications_count: stat.modifications,
-        commits_count: stat.commits.size,
-        contributors_count: Math.max(1, contributors),
-        lines_added: stat.linesAdded,
-        lines_deleted: stat.linesDeleted,
-        code_churn: churn,
-        bug_fix_commits_count: stat.bugFixes,
-        risk_level,
-        confidence,
-        last_modified: stat.lastDate,
-        evidence: [
-          {
-            metric: 'Dosya Değişiklik Sayısı',
-            value: stat.modifications,
-            description: `Son analiz döneminde ${stat.modifications} değişiklik kaydedildi.`,
-          },
-          {
-            metric: 'Hata Düzeltme Commit Sayısı',
-            value: stat.bugFixes,
-            description: `Bu dosyayı etkileyen ${stat.bugFixes} adet hata hedefli commit bulundu.`,
-          },
-          {
-            metric: 'Katkıda Bulunan Geliştirici',
-            value: contributors,
-            description: `${contributors} farklı geliştirici bu dosyayı düzenledi.`,
-          },
-          {
-            metric: 'Kod Dalgalanması (Churn)',
-            value: `${churn.toLocaleString()} satır`,
-            description: `Eklenen (${stat.linesAdded}) ve silinen (${stat.linesDeleted}) satırlar yüksek bakım oynaklığı oluşturuyor.`,
-          },
-        ],
+        const avg_churn_per_commit = stat.modifications > 0 ? Math.round(churn / stat.modifications) : 0;
+
+        return {
+          path: stat.path,
+          repo_name: stat.repo_name,
+          language,
+          modifications_count: stat.modifications,
+          commits_count: stat.commits.size,
+          contributors_count: Math.max(1, contributors),
+          lines_added: stat.linesAdded,
+          lines_deleted: stat.linesDeleted,
+          code_churn: churn,
+          avg_churn_per_commit,
+          bug_fix_commits_count: stat.bugFixes,
+          risk_level,
+          confidence,
+          last_modified: stat.lastDate,
+          evidence: [
+            {
+              metric: 'Dosya Değişiklik Sayısı',
+              value: stat.modifications,
+              description: `Son analiz döneminde ${stat.modifications} değişiklik kaydedildi.`,
+            },
+            {
+              metric: 'Commit Başına Ortalama Churn',
+              value: `~${avg_churn_per_commit.toLocaleString()} satır/commit`,
+              description: `Her düzenleme işleminde ortalama ${avg_churn_per_commit} satır kod dalgalanması gerçekleşti.`,
+            },
+            {
+              metric: 'Hata Düzeltme Commit Sayısı',
+              value: stat.bugFixes,
+              description: stat.bugFixes > 0
+                ? `Bu dosyayı etkileyen ${stat.bugFixes} adet hata hedefli commit bulundu.`
+                : 'Bu dosyada henüz hata düzeltmesi kaydedilmedi, modül stabil yapıda.',
+            },
+            {
+              metric: 'Katkıda Bulunan Geliştirici',
+              value: contributors,
+              description: `${contributors} farklı geliştirici bu dosyayı düzenledi.`,
+            },
+            {
+              metric: 'Toplam Kod Dalgalanması (Churn)',
+              value: `${churn.toLocaleString()} satır`,
+              description: `Eklenen (${stat.linesAdded}) ve silinen (${stat.linesDeleted}) satırlar toplam bakım oynaklığını oluşturuyor.`,
+            },
+          ],
         recommendation,
       };
     });
@@ -177,6 +220,12 @@ export class HotspotEngine {
       const riskWeight = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
       if (riskWeight[b.risk_level] !== riskWeight[a.risk_level]) {
         return riskWeight[b.risk_level] - riskWeight[a.risk_level];
+      }
+      if (b.bug_fix_commits_count !== a.bug_fix_commits_count) {
+        return b.bug_fix_commits_count - a.bug_fix_commits_count;
+      }
+      if (b.modifications_count !== a.modifications_count) {
+        return b.modifications_count - a.modifications_count;
       }
       return b.code_churn - a.code_churn;
     });

@@ -4,10 +4,11 @@ import { AI_REQUEST_TIMEOUT_MS, AI_TOTAL_TIMEOUT_MS } from './constants.js';
 let aiInstance: GoogleGenAI | null = null;
 
 export const GEMINI_MODEL_CHAIN = [
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
+  'gemini-3.5-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
 ];
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -72,8 +73,9 @@ export async function generateGeminiText(
       if (result && result.text) {
         return result.text;
       }
-    } catch (err: any) {
-      console.warn(`[DevControl AI] Model ${model} çağrısında hata alındı, zincirdeki sonrakine geçiliyor:`, err?.message?.substring(0, 100));
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn(`[DevControl AI] Model ${model} çağrısında hata alındı, zincirdeki sonrakine geçiliyor:`, errMsg.substring(0, 100));
       continue;
     }
   }
@@ -105,8 +107,8 @@ export async function callGeminiWithRetry<T>(
           `Gemini ${model} API request timed out`,
         );
         return result;
-      } catch (err: any) {
-        const errMsg = err?.message || String(err);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
         const isTransient =
           errMsg.includes('503') ||
           errMsg.includes('UNAVAILABLE') ||

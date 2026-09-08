@@ -188,6 +188,37 @@ export class RiskEngine {
       });
     }
 
+    // 6. Kritik CI/CD Pipeline Başarısızlığı Riski
+    repositories.forEach((repo) => {
+      if (repo.latest_ci_run && repo.latest_ci_run.conclusion === 'failure') {
+        risks.push({
+          id: `risk_ci_failure_${repo.name}`,
+          title: `${repo.name} deposunda son CI/CD derleme hattı başarısız oldu`,
+          severity: 'HIGH',
+          category: 'CI_FAILURE',
+          affectedRepository: repo.name,
+          repo_name: repo.name,
+          summary: `${repo.name} deposundaki "${repo.latest_ci_run.name || 'CI'}" iş akışı en son çalıştırmada hata verdi. Canlıya çıkış hattında veya testlerde kırılma olabilir.`,
+          evidence: [
+            {
+              metric: 'İş Akışı (Workflow)',
+              value: repo.latest_ci_run.name || 'CI/CD Pipeline',
+              description: 'GitHub Actions workflow çalışması başarısız sonuçlandı.',
+            },
+            {
+              metric: 'Son Çalışma Zamanı',
+              value: repo.latest_ci_run.updated_at ? new Date(repo.latest_ci_run.updated_at).toLocaleDateString('tr-TR') : 'Bilinmiyor',
+              description: 'Derleme veya test adımlarında hata oluştu.',
+            },
+          ],
+          confidence: 95,
+          recommendedAction: 'GitHub Actions loglarını inceleyin ve başarısız olan birim/entegrasyon testlerini veya build hatalarını giderin.',
+          firstDetected: repo.latest_ci_run.updated_at || new Date().toISOString(),
+          status: 'OPEN',
+        });
+      }
+    });
+
     return risks;
   }
 }

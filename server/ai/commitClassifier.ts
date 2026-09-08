@@ -10,10 +10,52 @@ export class CommitSemanticClassifier {
   private static readonly BATCH_SIZE = 25;
 
   /**
+   * Konvansiyonel Git commit başlıklarından ve anahtar kelimelerden deterministik kural tabanlı ön sınıflandırma üretir.
+   */
+  public static classifyByConvention(message: string, sha: string): CommitSemanticAnalysis {
+    const msg = (message || '').trim().toLowerCase();
+    let isBugFix = false;
+    let category: CommitSemanticAnalysis['category'] = 'CHORE';
+    let reasoning = 'Konvansiyonel commit başlığı analizi.';
+
+    if (/^(fix|bug|hotfix|patch)(\(.*\))?!?:|^revert\b|\bfix(es|ed)?\b|\bbug(s)?\b|\bpatch\b|\bhata\b|\bdüzelt|\bsorun\b|\bproblem\b|\berror\b|\bcrash\b|\bçözüm\b|\bgideril/i.test(msg)) {
+      isBugFix = true;
+      category = 'BUG_FIX';
+      reasoning = 'Hata veya regresyon düzeltmesi tespit edildi.';
+    } else if (/^(feat|feature)(\(.*\))?!?:|\bözellik\b|\bekle/i.test(msg)) {
+      category = 'FEATURE';
+      reasoning = 'Yeni özellik veya geliştirme.';
+    } else if (/^(refactor|style)(\(.*\))?!?:|\bclean\b|\bdüzenle/i.test(msg)) {
+      category = 'REFACTOR';
+      reasoning = 'Kod yeniden yapılandırması veya temizlik.';
+    } else if (/^(perf)(\(.*\))?!?:|\boptimi|\bperformans\b/i.test(msg)) {
+      category = 'PERFORMANCE';
+      reasoning = 'Performans optimizasyonu.';
+    } else if (/^(sec|security)(\(.*\))?!?:|\bgüvenlik\b/i.test(msg)) {
+      isBugFix = true;
+      category = 'SECURITY';
+      reasoning = 'Güvenlik yaması veya zafiyet düzeltmesi.';
+    } else if (/^(docs)(\(.*\))?!?:|\breadme\b|\bdoküman\b/i.test(msg)) {
+      category = 'DOCUMENTATION';
+      reasoning = 'Dokümantasyon güncellemesi.';
+    } else if (/^(chore|build|ci|test)(\(.*\))?!?:|\bbump\b|\bdeps\b|\bbağımlılık\b/i.test(msg)) {
+      category = 'CHORE';
+      reasoning = 'Rutin bakım, test veya konfigürasyon.';
+    }
+
+    return {
+      sha,
+      isBugFix,
+      category,
+      reasoning,
+      confidence: 75,
+    };
+  }
+
+  /**
    * Verilen commit listesini gruplar halinde (batch) Gemini yapay zekasına göndererek
    * arkasındaki gerçek mühendislik niyetini (intent) anlamsal olarak tespit eder.
-   * Kesinlikle hard-coded regex veya sahte yedekler kullanılmaz; tüm sınıflandırma
-   * doğrudan Gemini LLM modelleri tarafından yürütülür.
+   * LLM erişilemez veya kota dışı olduğunda deterministik kural tabanlı fallback kullanılır.
    */
   public static async classifyCommits(
     commits: { sha: string; message: string; repo_name?: string }[]
@@ -21,11 +63,13 @@ export class CommitSemanticClassifier {
     const resultMap = new Map<string, CommitSemanticAnalysis>();
     const uncachedCommits: { sha: string; message: string }[] = [];
 
-    // 1. Önce önbellekte var olanları doğrudan al
+    // 1. Önce önbellekte var olanları doğrudan al; olmayanlara ön kural tabanlı analiz ata
     for (const commit of commits) {
       if (this.cache.has(commit.sha)) {
         resultMap.set(commit.sha, this.cache.get(commit.sha)!);
       } else {
+        const fallback = this.classifyByConvention(commit.message, commit.sha);
+        resultMap.set(commit.sha, fallback);
         uncachedCommits.push({ sha: commit.sha, message: commit.message });
       }
     }

@@ -95,7 +95,7 @@ export class InsightsEngine {
       dynamicBriefItems.push({
         id: `brief_hotspot_${topHotspot.repo_name}_${fileName}`,
         priority: topHotspot.risk_level === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
-        title: `${topHotspot.repo_name} deposunda kod sıcak noktası: ${fileName}`,
+        title: `${topHotspot.repo_name} deposunda kritik kod dosyası: ${fileName}`,
         description: `${topHotspot.path} dosyası ${topHotspot.modifications_count} kez değiştirildi ve ${topHotspot.bug_fix_commits_count} hata düzeltmesi içeriyor (${topHotspot.code_churn.toLocaleString()} satır kod dalgalanması).`,
         relatedRepo: topHotspot.repo_name,
         actionable: true,
@@ -164,7 +164,7 @@ KESİNLİKLE UYULMASI GEREKEN KURALLAR:
    - YANLIŞ: "High change volatility & bug concentration in service.ts"
    - DOĞRU: "service.ts dosyasında yüksek değişim oynaklığı ve hata yoğunluğu"
    - YANLIŞ: "Code hotspot in Repo: file.ts"
-   - DOĞRU: "Repo deposunda kod sıcak noktası: file.ts"
+   - DOĞRU: "Repo deposunda kritik kod dosyası: file.ts"
    - YANLIŞ: "Recurring churn in Repo/file.ts"
    - DOĞRU: "Repo/file.ts üzerinde tekrarlayan kod dalgalanması"
    - YANLIŞ: "Exemplary engineering hygiene in Repo"
@@ -183,7 +183,7 @@ KESİNLİKLE UYULMASI GEREKEN KURALLAR:
 
 Veriler:
 Genel Sağlık Skoru: ${healthScore.overallScore}
-Öne Çıkan Sıcak Noktalar: ${hotspots.slice(0, 3).map((h) => `${h.repo_name}/${h.path} (${h.modifications_count} değişiklik, ${h.code_churn} satır)`).join(', ')}
+Öne Çıkan Kritik Dosyalar: ${hotspots.slice(0, 3).map((h) => `${h.repo_name}/${h.path} (${h.modifications_count} değişiklik, ${h.code_churn} satır)`).join(', ')}
 Aktif Riskler: ${risks.map((r) => `${r.affectedRepository}: ${r.title}`).join('; ')}
 `;
 
@@ -255,7 +255,7 @@ Aktif Riskler: ${risks.map((r) => `${r.affectedRepository}: ${r.title}`).join(';
         {
           id: 'insight_no_data',
           title: 'GitHub telemetrisi olmadan içgörü üretilemiyor',
-          summary: 'Commit, PR veya issue kaydı gelmeden kod sıcak noktası, risk ve sağlık değerlendirmesi yapılamaz.',
+          summary: 'Commit veya PR kaydı gelmeden kritik dosya, risk ve sağlık değerlendirmesi yapılamaz.',
           priority: 'MEDIUM',
           category: 'ARCHITECTURE',
           targetRepo: reposList[0]?.name,
@@ -384,7 +384,7 @@ Veriler:
 Genel Sağlık Skoru: ${healthScore.overallScore}/100
 Aktif Depolar: ${activeRepoNames}
 Son Commitler: ${recentCommitMsgs}
-Sıcak Noktalar: ${hotspotSummary || 'Yok'}
+Kritik Dosyalar: ${hotspotSummary || 'Yok'}
 Tespit Edilen Riskler: ${risks.slice(0, 3).map((r) => `${r.title} (${r.severity})`).join(', ') || 'Yok'}
 Açık Kayıt Sayısı: ${issues.length} issue
 
@@ -456,7 +456,8 @@ JSON ŞEMASI:
   public static async reviewRepository(
     repo: Repository,
     commits: CommitMetric[],
-    hotspots: FileHotspot[]
+    hotspots: FileHotspot[],
+    fileTree: string[] = []
   ): Promise<RepoAiReview> {
     const repoCommits = commits.filter(c => c.repo_name.toLowerCase() === repo.name.toLowerCase());
     const repoHotspots = hotspots.filter(h => h.repo_name.toLowerCase() === repo.name.toLowerCase());
@@ -468,10 +469,14 @@ DEPO AYRINTILARI:
 - Depo Adı: ${repo.name} (${repo.full_name})
 - Birincil Dil: ${repo.language}
 - Açıklama: ${repo.description}
-- Yıldız: ${repo.stargazers_count}, Fork: ${repo.forks_count}, Açık Sorun (Issue): ${repo.open_issues_count}
+- Yıldız: ${repo.stargazers_count}, Fork: ${repo.forks_count}
+${repo.latest_ci_run ? `- CI/CD Durumu: ${repo.latest_ci_run.name} (${repo.latest_ci_run.conclusion || repo.latest_ci_run.status})` : ''}
+${repo.latest_release ? `- En Son Sürüm: ${repo.latest_release.tag_name} (${repo.latest_release.published_at.slice(0, 10)})` : ''}
+${repo.languages && Object.keys(repo.languages).length > 0 ? `- Diller (Hacim): ${Object.entries(repo.languages).map(([l, b]) => `${l} (${Math.round(b / 1024)} KB)`).join(', ')}` : ''}
 - Son Güncelleme: ${repo.updated_at}
 - Analiz Edilen Commit Hacmi: ${repoCommits.length} commit
-- Tespit Edilen Sıcak Noktalar: ${repoHotspots.map(h => `${h.path} (${h.modifications_count} değişiklik, ${h.code_churn} satır)`).join(', ') || 'Temiz (Sıcak nokta yok)'}
+- Tespit Edilen Kritik Dosyalar: ${repoHotspots.map(h => `${h.path} (${h.modifications_count} değişiklik, ${h.code_churn} satır)`).join(', ') || 'Temiz (Kritik dosya yok)'}
+${fileTree.length > 0 ? `- Proje Dosya ve Klasör Hiyerarşisi (Ağaç Görünümü):\n${fileTree.slice(0, 50).map(f => `  • ${f}`).join('\n')}` : ''}
 - Son Commit Mesajları:
 ${repoCommits.slice(0, 12).map(c => `- ${c.message} (+${c.additions}/-${c.deletions})`).join('\n') || '- Doğrudan commit kaydı bulunamadı'}
 
@@ -526,7 +531,31 @@ ${repoCommits.slice(0, 12).map(c => `- ${c.message} (+${c.additions}/-${c.deleti
         const response = await gemini.models.generateContent({
           model,
           contents: prompt,
-          config: { responseMimeType: 'application/json' },
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                repoName: { type: Type.STRING },
+                architectureOverview: { type: Type.STRING },
+                codeQualityScore: { type: Type.INTEGER },
+                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+                technicalDebts: { type: Type.ARRAY, items: { type: Type.STRING } },
+                securityObservations: { type: Type.ARRAY, items: { type: Type.STRING } },
+                recommendedRoadmap: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      title: { type: Type.STRING },
+                      description: { type: Type.STRING },
+                      priority: { type: Type.STRING },
+                    },
+                  },
+                },
+              },
+            },
+          },
         });
         if (response.text) {
           const parsed = JSON.parse(response.text.trim());
@@ -582,10 +611,10 @@ ${repoCommits.slice(0, 12).map(c => `- ${c.message} (+${c.additions}/-${c.deleti
 
     const defaultPersona: DeveloperPersona = {
       personaTitle: 'Modern Full-Stack Mimarı & Çevik Yazılım Geliştirici',
-      summary: `${user.name || user.login}, ${repositories.length} kişisel depo ve ${commits.length} son commit ile ${primaryLanguages[0]?.name || 'TypeScript'} ağırlıklı modern web ekosisteminde dinamik ve üretken bir geliştirici profilini temsil etmektedir.`,
+      summary: `${user.name || user.login}, ${repositories.length} kişisel depo ve son 7 gündeki ${commits.length} commit ile ${primaryLanguages[0]?.name || 'TypeScript'} ağırlıklı modern web ekosisteminde dinamik ve üretken bir geliştirici profilini temsil etmektedir.`,
       primaryLanguages,
       productivityMetrics: {
-        weeklyCommitFrequency: Math.max(1, Math.round(commits.length / 4)),
+        weeklyCommitFrequency: Math.max(1, commits.length),
         dominantWorkingHours: 'Aktif Gece & Akşam Odak Seansları',
         bugFixEfficiency: `%${Math.max(60, 100 - bugFixRate)} Proaktif Özellik Geliştirme`,
         conventionalCommitHygiene: `%${conventionalRate > 0 ? conventionalRate : 75} Standartlaştırılmış Mesaj Hijyeni`,
@@ -611,7 +640,7 @@ GELİŞTİRİCİ VERİLERİ:
 - Biyografi: ${user.bio || 'Yazılım Geliştirici'}
 - Toplam Kişisel Depoları: ${repositories.length} depo
 - Dil Dağılımı: ${primaryLanguages.map(l => `${l.name}: %${l.percentage}`).join(', ')}
-- Son 30 Günde İncelenen Commit Sayısı: ${commits.length}
+- Son 7 Günde İncelenen Commit Sayısı: ${commits.length}
 - Hata Düzeltme Oranı: %${bugFixRate}
 - Tipik Commit Başlıkları:
 ${commits.slice(0, 15).map(c => `- ${c.message}`).join('\n') || '- Doğrudan commit bulunmuyor'}
@@ -622,7 +651,7 @@ ${commits.slice(0, 15).map(c => `- ${c.message}`).join('\n') || '- Doğrudan com
   "summary": "Geliştiricinin güçlü teknik kaslarını, üretim temposunu ve uzmanlık alanını özetleyen 2-3 cümlelik Türkçe paragraf.",
   "primaryLanguages": ${JSON.stringify(primaryLanguages)},
   "productivityMetrics": {
-    "weeklyCommitFrequency": ${Math.max(1, Math.round(commits.length / 4))},
+    "weeklyCommitFrequency": ${Math.max(1, commits.length)},
     "dominantWorkingHours": "Akşam & Gece Geliştirme Seansları",
     "bugFixEfficiency": "%${Math.max(60, 100 - bugFixRate)} Proaktif Geliştirme",
     "conventionalCommitHygiene": "%${conventionalRate > 0 ? conventionalRate : 78} Semantik Standart"
@@ -642,7 +671,37 @@ ${commits.slice(0, 15).map(c => `- ${c.message}`).join('\n') || '- Doğrudan com
         const response = await gemini.models.generateContent({
           model,
           contents: prompt,
-          config: { responseMimeType: 'application/json' },
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                personaTitle: { type: Type.STRING },
+                summary: { type: Type.STRING },
+                primaryLanguages: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      percentage: { type: Type.INTEGER }
+                    }
+                  }
+                },
+                productivityMetrics: {
+                  type: Type.OBJECT,
+                  properties: {
+                    weeklyCommitFrequency: { type: Type.INTEGER },
+                    dominantWorkingHours: { type: Type.STRING },
+                    bugFixEfficiency: { type: Type.STRING },
+                    conventionalCommitHygiene: { type: Type.STRING }
+                  }
+                },
+                superpowers: { type: Type.ARRAY, items: { type: Type.STRING } },
+                growthAreas: { type: Type.ARRAY, items: { type: Type.STRING } }
+              }
+            }
+          },
         });
         if (response.text) {
           const parsed = JSON.parse(response.text.trim());
@@ -710,7 +769,7 @@ export class ModularHandler implements DedicatedService {
 
     try {
       const prompt = `Sen Kıdemli Yazılım Refactoring Uzmanısın.
-Aşağıda çok sık değişen ve hata içeren kod sıcak noktası (hotspot) için Türkçe somut bir yeniden yapılandırma (refactor) planı üret.
+Aşağıda çok sık değişen ve hata içeren kritik kod dosyası (hotspot) için Türkçe somut bir yeniden yapılandırma (refactor) planı üret.
 
 DOSYA BİLGİSİ:
 - Dosya: ${hotspot.path} (Depo: ${hotspot.repo_name})
@@ -743,7 +802,21 @@ ${relevantCommits.slice(0, 5).map(c => `- ${c.message}`).join('\n') || '- Yakın
         const response = await gemini.models.generateContent({
           model,
           contents: prompt,
-          config: { responseMimeType: 'application/json' },
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                filePath: { type: Type.STRING },
+                repoName: { type: Type.STRING },
+                antiPatternsDetected: { type: Type.ARRAY, items: { type: Type.STRING } },
+                proposedDesignPattern: { type: Type.STRING },
+                refactorSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+                sampleCodeSnippet: { type: Type.STRING },
+                expectedImpact: { type: Type.STRING },
+              },
+            },
+          },
         });
         if (response.text) {
           const parsed = JSON.parse(response.text.trim());

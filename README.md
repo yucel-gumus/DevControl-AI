@@ -37,15 +37,15 @@ Bu proje **[Yücel Gümüş](https://yucelgumus.dev/)** tarafından sıfırdan t
 - Yapay zeka tahminlerine veya halüsinasyonlara izin vermeyen **matematiksel metrik motoru**:
   - **Kod Sağlığı (Code Health)**: Hata düzeltme oranı ve ortalama commit dalgalanmasına göre puanlama.
   - **Teslimat Ritmi (Delivery)**: Kişisel commit frekansı ve PR yaşam döngüsü hızı.
-  - **Sıcak Nokta Radarı (Hotspots)**: En çok hata alan ve sık değişen kritik kaynak kod dosyalarını tespit eder.
+  - **Kritik Dosyalar Radarı (Hotspots)**: En çok hata alan ve sık değişen kritik kaynak kod dosyalarını tespit eder.
   - **Mühendislik Riskleri (Risks)**: Durgun PR'lar, yüksek oynaklıktaki dosyalar ve dokümantasyon borçları.
 
 ### 3. 🤖 Google Gemini Yapay Zeka Entegrasyonu
-- **Geliştirici Personası (Developer Persona)**: Son 30 günlük commit telemetriniz ve dilleriniz üzerinden teknik unvanınızı, süper güçlerinizi ve gelişim alanlarınızı sentezler.
+- **Geliştirici Personası (Developer Persona)**: Son 7 günlük commit telemetriniz ve dilleriniz üzerinden teknik unvanınızı, süper güçlerinizi ve gelişim alanlarınızı sentezler.
 - **Yapay Zeka Analisti (Ask AI / Agent Planner)**: Projeleriniz hakkında teknik sorular sorabileceğiniz, arka planda telemetri araçlarını (`get_hotspots`, `get_health_score`, vb.) çalıştıran otonom analist.
 - **Depo İnceleme Raporu (AI Repo Review)**: Tek tıkla herhangi bir deponun mimarisini, güçlü yanlarını ve 14 günlük aksiyon planını çıkaran inceleme modalı.
-- **Yeniden Düzenleme Planı (AI Refactoring Blueprint)**: Sıcak noktalardaki karmaşık dosyalar için somut SOLID / SRP refactoring adımları ve kod şablonları önerir.
-- **Çoklu Model Yedekleme Zinciri (Fallback Chain)**: `gemini-3.7-flash` -> `gemini-3.5-flash-lite` -> `gemini-3.6-flash`.
+- **Yeniden Düzenleme Planı (AI Refactoring Blueprint)**: Kritik dosyalardaki karmaşık modüller için somut SOLID / SRP refactoring adımları ve kod şablonları önerir.
+- **Çoklu Model Yedekleme Zinciri (Fallback Chain)**: `gemini-3.8-flash` -> `gemini-3.7-flash` -> `gemini-3.6-flash` -> `gemini-3.5-flash-lite` -> `gemini-2.5-flash` -> `gemini-2.0-flash` -> `gemini-1.5-flash`.
 
 ---
 

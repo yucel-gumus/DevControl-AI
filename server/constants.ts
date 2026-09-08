@@ -5,7 +5,7 @@ export const MS_PER_DAY = 24 * MS_PER_HOUR;
 
 export const TELEMETRY_WINDOW_DAYS = 30;
 export const GITHUB_REQUEST_TIMEOUT_MS = 15_000;
-export const AI_REQUEST_TIMEOUT_MS = 8_000;
+export const AI_REQUEST_TIMEOUT_MS = 15_000;
 export const AI_TOTAL_TIMEOUT_MS = 30_000;
 
 export const STALE_ISSUE_THRESHOLD_DAYS = 14;

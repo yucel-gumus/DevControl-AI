@@ -67,7 +67,7 @@ export const AskAiView: React.FC<Props> = ({
 
   const defaultPrompts = [
     'En yüksek hata oranına sahip 3 kritik dosyamı ve nedenlerini analiz et.',
-    'Son 14 günlük commit tempomu ve kod oynaklığı trendlerimi açıkla.',
+    'Son 7 günlük commit tempomu ve kod oynaklığı trendlerimi açıkla.',
     'En çok kod dalgalanması olan depom için 3 somut mimari iyileştirme öner.',
   ];
 
@@ -118,7 +118,7 @@ export const AskAiView: React.FC<Props> = ({
                 Kod Tabanınız Hakkında Soru Sorun
               </h3>
               <p className="text-xs text-[#4a3e3b] font-medium">
-                Ajan; depolarınızı, sıcak noktaları, hata oranlarını ve PR durumlarını analiz ederek somut yanıtlar üretir.
+                Ajan; depolarınızı, kritik dosyaları, hata oranlarını ve PR durumlarını analiz ederek somut yanıtlar üretir.
               </p>
             </div>
 

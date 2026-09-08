@@ -173,7 +173,7 @@ export class ToolRegistry {
 
     this.registerTool({
       name: 'get_hotspots',
-      description: 'Kod dalgalanması, değişiklik hızı ve risk derecelerine sahip kod sıcak noktalarını (hotspot) getirir.',
+      description: 'Kod dalgalanması, değişiklik hızı ve risk derecelerine sahip kritik kod dosyalarını (hotspot) getirir.',
       inputSchema: {
         type: 'object',
         properties: {

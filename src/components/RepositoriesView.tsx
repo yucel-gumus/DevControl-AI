@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Search,
   ExternalLink,
@@ -11,6 +11,9 @@ import {
   Calendar,
   AlertCircle,
   ShieldCheck,
+  Star,
+  GitFork,
+  Tag,
 } from 'lucide-react';
 import { Repository, GitHubUser, RepoAiReview } from '../types.js';
 import { useRepoReview } from '../hooks/useMetrics.js';
@@ -31,19 +34,25 @@ export const RepositoriesView: React.FC<Props> = ({
   const [search, setSearch] = useState('');
   const [filterLang, setFilterLang] = useState<string>('ALL');
 
-  // AI İnceleme Modalı Durumu
+  // KENSAI İnceleme Modalı Durumu
   const [activeRepoForReview, setActiveRepoForReview] = useState<Repository | null>(null);
+  const activeRepoNameRef = useRef<string | null>(null);
   const [reviewResult, setReviewResult] = useState<RepoAiReview | null>(null);
   const repoReviewMutation = useRepoReview();
 
   const handleTriggerReview = async (repo: Repository) => {
     setActiveRepoForReview(repo);
+    activeRepoNameRef.current = repo.name;
     setReviewResult(null);
     try {
       const res = await repoReviewMutation.mutateAsync(repo.name);
-      setReviewResult(res);
+      if (activeRepoNameRef.current === repo.name) {
+        setReviewResult(res);
+      }
     } catch (err) {
-      console.error('İnceleme alınamadı:', err);
+      if (activeRepoNameRef.current === repo.name) {
+        console.error('İnceleme alınamadı:', err);
+      }
     }
   };
 
@@ -194,12 +203,59 @@ export const RepositoriesView: React.FC<Props> = ({
                   <p className="text-xs text-[#4a3e3b] line-clamp-2 leading-relaxed font-medium">
                     {repo.description || 'Açıklama bulunmuyor.'}
                   </p>
+
+                  {/* CI/CD, Sürüm ve Dal Rozetleri */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {repo.latest_ci_run ? (
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border border-[#231c1a]/15 flex items-center gap-1 ${repo.latest_ci_run.conclusion === 'success'
+                          ? 'bg-[#f9b88e] text-[#231c1a]'
+                          : repo.latest_ci_run.conclusion === 'failure'
+                            ? 'bg-[#231c1a] text-[#f9b88e]'
+                            : 'bg-[#b9aba9]/50 text-[#231c1a]'
+                          }`}
+                        title={`En son CI workflow: ${repo.latest_ci_run.name} (${repo.latest_ci_run.conclusion || repo.latest_ci_run.status})`}
+                      >
+                        <ShieldCheck className="w-3 h-3 shrink-0" />
+                        <span>CI: {repo.latest_ci_run.conclusion === 'success' ? 'Geçti' : repo.latest_ci_run.conclusion === 'failure' ? 'Hata' : repo.latest_ci_run.status}</span>
+                      </span>
+                    ) : null}
+
+                    {repo.latest_release ? (
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded border border-[#231c1a]/15 bg-[#b9aba9]/40 text-[#231c1a] flex items-center gap-1"
+                        title={`Son yayınlanan sürüm: ${repo.latest_release.tag_name} (${repo.latest_release.published_at.slice(0, 10)})`}
+                      >
+                        <Tag className="w-3 h-3 shrink-0 text-[#231c1a]" />
+                        <span>{repo.latest_release.tag_name}</span>
+                      </span>
+                    ) : null}
+
+                    {repo.branches_count && repo.branches_count > 1 ? (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-[#231c1a]/15 bg-[#b9aba9]/30 text-[#4a3e3b]">
+                        {repo.branches_count} dal
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="space-y-3 pt-2 border-t border-[#a89997]">
                   <div className="flex items-center justify-between text-[11px] text-[#4a3e3b]">
-                    <span className="font-bold">{repo.language || 'Belirtilmemiş'}</span>
-                    <span>{repo.open_issues_count} Issue · {repo.forks_count} Fork</span>
+                    <span className="font-bold truncate max-w-[140px]" title={repo.languages ? Object.keys(repo.languages).join(', ') : repo.language}>
+                      {repo.language || 'Belirtilmemiş'}
+                      {repo.languages && Object.keys(repo.languages).length > 1 ? ` (+${Object.keys(repo.languages).length - 1})` : ''}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 font-medium">
+                        <Star className="w-3 h-3 text-[#231c1a]" />
+                        <span>{repo.stargazers_count || 0} Star</span>
+                      </span>
+                      <span>·</span>
+                      <span className="inline-flex items-center gap-1 font-medium">
+                        <GitFork className="w-3 h-3 text-[#231c1a]" />
+                        <span>{repo.forks_count || 0} Fork</span>
+                      </span>
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
@@ -225,7 +281,8 @@ export const RepositoriesView: React.FC<Props> = ({
 
                       <button
                         onClick={() => onAskAboutRepo(repo.name)}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer"
+                        title="Depo hakkında yapay zeka analistine soru sor"
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer shadow-xs"
                       >
                         Kensai
                       </button>
@@ -250,7 +307,7 @@ export const RepositoriesView: React.FC<Props> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-[#231c1a]">
-                    {activeRepoForReview.name} — Gemini Mimari İnceleme
+                    {activeRepoForReview.name} — Kensai Mimari İnceleme
                   </h3>
                   <span className="text-[11px] text-[#4a3e3b] block mt-0.5 font-medium">
                     Otomatik kod kalitesi ve sağlık değerlendirmesi
@@ -285,6 +342,37 @@ export const RepositoriesView: React.FC<Props> = ({
               </div>
             )}
 
+            {/* Hata Durumu */}
+            {repoReviewMutation.isError && !reviewResult && (
+              <div className="py-8 text-center space-y-3">
+                <div className="p-3 rounded-full bg-[#f9b88e]/40 border border-[#231c1a]/20 inline-flex text-[#231c1a]">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <p className="text-xs font-bold text-[#231c1a]">
+                  {repoReviewMutation.error?.message || 'İnceleme raporu alınırken bir hata oluştu.'}
+                </p>
+                <div className="flex justify-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerReview(activeRepoForReview)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 hover:brightness-105 transition-all cursor-pointer shadow-xs"
+                  >
+                    Tekrar Dene
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveRepoForReview(null);
+                      setReviewResult(null);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer"
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            )}
+
             {reviewResult && (
               <div className="space-y-4 text-xs leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
                 {/* Kalite Skoru ve Mimari Değerlendirme Özeti */}
@@ -300,7 +388,7 @@ export const RepositoriesView: React.FC<Props> = ({
                     )}
                   </div>
                   <p className="text-xs text-[#231c1a] font-medium leading-relaxed">
-                    {reviewResult.architectureOverview || (reviewResult as any).architecturalSummary}
+                    {reviewResult.architectureOverview}
                   </p>
                 </div>
 
@@ -326,26 +414,25 @@ export const RepositoriesView: React.FC<Props> = ({
                 )}
 
                 {/* Kritik İyileştirme Alanları & Teknik Borçlar */}
-                {((reviewResult.technicalDebts && reviewResult.technicalDebts.length > 0) ||
-                  ((reviewResult as any).weaknesses && (reviewResult as any).weaknesses.length > 0)) && (
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
-                        <span>İyileştirme Gereken Alanlar & Teknik Borçlar</span>
-                      </h4>
-                      <ul className="space-y-1.5">
-                        {(reviewResult.technicalDebts || (reviewResult as any).weaknesses)?.map((debt: string, idx: number) => (
-                          <li
-                            key={idx}
-                            className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#4a3e3b] mt-1.5 shrink-0" />
-                            <span>{debt}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                {reviewResult.technicalDebts && reviewResult.technicalDebts.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                      <span>Teknik Borçlar & Zayıf Yönler</span>
+                    </h4>
+                    <ul className="space-y-1.5">
+                      {reviewResult.technicalDebts.map((debt: string, idx: number) => (
+                        <li
+                          key={idx}
+                          className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#4a3e3b] mt-1.5 shrink-0" />
+                          <span>{debt}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {/* Güvenlik Gözlemleri */}
                 {Array.isArray(reviewResult.securityObservations) && reviewResult.securityObservations.length > 0 && (
@@ -369,63 +456,48 @@ export const RepositoriesView: React.FC<Props> = ({
                 )}
 
                 {/* 14 Günlük Mühendislik Aksiyon Planı / Yol Haritası */}
-                {((reviewResult.recommendedRoadmap && reviewResult.recommendedRoadmap.length > 0) ||
-                  ((reviewResult as any).actionItemsNext14Days && (reviewResult as any).actionItemsNext14Days.length > 0)) && (
+                {reviewResult.recommendedRoadmap && reviewResult.recommendedRoadmap.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                      <span>14 Günlük Mühendislik Aksiyon Planı</span>
+                    </h4>
                     <div className="space-y-2">
-                      <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
-                        <span>14 Günlük Mühendislik Aksiyon Planı</span>
-                      </h4>
-                      <div className="space-y-2">
-                        {Array.isArray(reviewResult.recommendedRoadmap) ? (
-                          reviewResult.recommendedRoadmap.map((item, idx: number) => {
-                            const priority = item.priority || 'MEDIUM';
-                            const priorityBadge =
-                              priority === 'HIGH'
-                                ? 'bg-[#231c1a] text-[#f9b88e]'
-                                : priority === 'MEDIUM'
-                                  ? 'bg-[#f9b88e] text-[#231c1a]'
-                                  : 'bg-[#b9aba9] text-[#231c1a]';
-                            return (
-                              <div
-                                key={idx}
-                                className="p-3 rounded-xl border border-[#a89997] bg-[#b9aba9]/30 space-y-1 text-[#231c1a] shadow-xs"
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="font-bold text-xs flex items-center gap-2">
-                                    <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
-                                      {idx + 1}
-                                    </span>
-                                    <span>{item.title}</span>
-                                  </span>
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border border-[#231c1a]/15 ${priorityBadge}`}>
-                                    {priority}
-                                  </span>
-                                </div>
-                                {item.description && (
-                                  <p className="text-[11px] text-[#4a3e3b] pl-6 font-medium leading-relaxed">
-                                    {item.description}
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          })
-                        ) : (
-                          (reviewResult as any).actionItemsNext14Days?.map((action: string, idx: number) => (
-                            <div
-                              key={idx}
-                              className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2.5 font-medium"
-                            >
-                              <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
-                                {idx + 1}
+                      {reviewResult.recommendedRoadmap.map((item, idx: number) => {
+                        const priority = item.priority || 'MEDIUM';
+                        const priorityBadge =
+                          priority === 'HIGH'
+                            ? 'bg-[#231c1a] text-[#f9b88e]'
+                            : priority === 'MEDIUM'
+                              ? 'bg-[#f9b88e] text-[#231c1a]'
+                              : 'bg-[#b9aba9] text-[#231c1a]';
+                        return (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-xl border border-[#a89997] bg-[#b9aba9]/30 space-y-1 text-[#231c1a] shadow-xs"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-xs flex items-center gap-2">
+                                <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                                  {idx + 1}
+                                </span>
+                                <span>{item.title}</span>
                               </span>
-                              <span>{action}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border border-[#231c1a]/15 ${priorityBadge}`}>
+                                {priority}
+                              </span>
                             </div>
-                          ))
-                        )}
-                      </div>
+                            {item.description && (
+                              <p className="text-[11px] text-[#4a3e3b] pl-6 font-medium leading-relaxed">
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+                  </div>
+                )}
 
                 {/* Alt Butonlar */}
                 <div className="pt-3 border-t border-[#a89997] flex justify-end gap-2">
@@ -437,7 +509,7 @@ export const RepositoriesView: React.FC<Props> = ({
                     }}
                     className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] hover:brightness-105 transition-all cursor-pointer border border-[#231c1a]/15 shadow-xs"
                   >
-                    AI Analistine Sor
+                    Kensai Sor
                   </button>
                   <button
                     onClick={() => {

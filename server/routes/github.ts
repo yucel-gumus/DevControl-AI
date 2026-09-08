@@ -23,6 +23,7 @@ authRouter.get('/status', asyncHandler(async (_req, res) => {
     syncError: state.syncError,
     telemetryStatus: state.telemetryStatus,
     rateLimitStatus: GitHubService.getRateLimitStatus(),
+    isCachedFromDb: Boolean(state.isCachedFromDb),
   });
 }));
 
@@ -65,7 +66,15 @@ reposRouter.get('/', asyncHandler(async (_req, res) => {
     syncError: state.syncError,
     telemetryStatus: state.telemetryStatus,
     rateLimitStatus: GitHubService.getRateLimitStatus(),
+    punchCard: ctx.punchCard || [],
+    languagesBreakdown: ctx.languagesBreakdown || [],
+    isCachedFromDb: Boolean(state.isCachedFromDb),
   });
+}));
+
+reposRouter.get('/punch-card', asyncHandler(async (_req, res) => {
+  const ctx = await GitHubService.getActiveTelemetryContext();
+  res.json({ punchCard: ctx.punchCard || [] });
 }));
 
 reposRouter.post('/toggle', asyncHandler(async (req, res) => {
@@ -79,7 +88,7 @@ reposRouter.post('/toggle', asyncHandler(async (req, res) => {
 
 reposRouter.post('/sync', asyncHandler(async (_req, res) => {
   try {
-    const state = await GitHubService.syncRepositories();
+    const state = await GitHubService.syncRepositories(true);
     if (state.syncStatus === 'no_data') {
       return res.status(409).json({ error: 'Eşitleme için önce bir GitHub hesabı bağlayın.' });
     }
@@ -91,9 +100,11 @@ reposRouter.post('/sync', asyncHandler(async (_req, res) => {
       syncError: state.syncError,
       telemetryStatus: state.telemetryStatus,
       rateLimitStatus: GitHubService.getRateLimitStatus(),
+      isCachedFromDb: false,
     });
-  } catch (err: any) {
-    res.status(502).json({ error: err.message || 'GitHub verileri eşitlenemedi.' });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'GitHub verileri eşitlenemedi.';
+    res.status(502).json({ error: errorMsg });
   }
 }));
 

@@ -73,6 +73,7 @@ export const useToggleRepo = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoId }),
+        timeoutMs: 60_000,
       }),
     onSuccess: () => {
       // Invalidate queries to refresh data
@@ -92,6 +93,7 @@ export const useSyncRepos = () => {
     mutationFn: () =>
       apiClient('/api/repos/sync', {
         method: 'POST',
+        timeoutMs: 120_000,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repositories'] });
@@ -120,6 +122,7 @@ export const useRepoReview = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoName }),
+        timeoutMs: 60_000,
       }),
   });
 };
@@ -131,6 +134,7 @@ export const useHotspotRefactor = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath, repoName }),
+        timeoutMs: 60_000,
       }),
   });
 };

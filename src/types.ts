@@ -8,6 +8,21 @@ export interface GitHubUser {
   public_repos: number;
 }
 
+export interface RepositoryCiRun {
+  name: string;
+  status: string;
+  conclusion?: string;
+  html_url?: string;
+  updated_at?: string;
+}
+
+export interface RepositoryRelease {
+  tag_name: string;
+  name?: string;
+  published_at: string;
+  html_url?: string;
+}
+
 export interface Repository {
   id: string;
   name: string;
@@ -26,6 +41,22 @@ export interface Repository {
   selected_for_analysis: boolean;
   health_score?: number;
   risk_level?: 'HEALTHY' | 'NEEDS_ATTENTION' | 'AT_RISK' | 'CRITICAL';
+  languages?: Record<string, number>;
+  latest_ci_run?: RepositoryCiRun;
+  latest_release?: RepositoryRelease;
+  branches_count?: number;
+}
+
+export interface PunchCardItem {
+  day: number;
+  hour: number;
+  count: number;
+}
+
+export interface LanguageBreakdownItem {
+  name: string;
+  bytes: number;
+  percentage: number;
 }
 
 export type CommitCategory =
@@ -113,6 +144,7 @@ export interface FileHotspot {
   lines_added: number;
   lines_deleted: number;
   code_churn: number;
+  avg_churn_per_commit?: number;
   bug_fix_commits_count: number;
   risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   confidence: number;
@@ -187,6 +219,7 @@ export interface AuthStatusResponse {
   syncError?: string;
   telemetryStatus: TelemetrySyncStatus;
   rateLimitStatus?: RateLimitStatus;
+  isCachedFromDb?: boolean;
 }
 
 export interface RepositoriesResponse {
@@ -196,6 +229,7 @@ export interface RepositoriesResponse {
   syncError?: string;
   telemetryStatus: TelemetrySyncStatus;
   rateLimitStatus?: RateLimitStatus;
+  isCachedFromDb?: boolean;
 }
 
 export interface RepoAiReview {
@@ -238,7 +272,7 @@ export interface EngineeringRisk {
   id: string;
   title: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-  category: 'CODE_HOTSPOT' | 'DELIVERY_BOTTLENECK' | 'TECHNICAL_DEBT' | 'DOCUMENTATION_GAP' | 'MAINTENANCE_STALENESS' | 'QUALITY_REGRESSION';
+  category: 'CODE_HOTSPOT' | 'DELIVERY_BOTTLENECK' | 'TECHNICAL_DEBT' | 'DOCUMENTATION_GAP' | 'MAINTENANCE_STALENESS' | 'QUALITY_REGRESSION' | 'CI_FAILURE';
   affectedRepository: string;
   repo_name?: string;
   affectedFiles?: string[];

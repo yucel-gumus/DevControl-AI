@@ -7,6 +7,15 @@ import {
   SyncStatus,
   TelemetrySyncStatus,
   RateLimitStatus,
+  PunchCardItem,
+  LanguageBreakdownItem,
+  RepositoryCiRun,
+  RepositoryRelease,
+  EngineeringHealthScore,
+  FileHotspot,
+  EngineeringRisk,
+  TodayBriefItem,
+  DeveloperPersona,
 } from '../../src/types.js';
 import {
   GITHUB_REQUEST_TIMEOUT_MS,
@@ -20,6 +29,7 @@ import { HotspotEngine } from '../metrics/hotspotEngine.js';
 import { RiskEngine } from '../metrics/riskEngine.js';
 import { HealthEngine } from '../metrics/healthEngine.js';
 import { CommitSemanticClassifier } from '../ai/commitClassifier.js';
+import { FirestoreService } from '../db/firestoreService.js';
 
 export const INITIAL_USER: GitHubUser = {
   id: '0',
@@ -38,6 +48,8 @@ export interface GitHubStoreState {
   commits: CommitMetric[];
   pullRequests: PullRequestMetric[];
   issues: IssueMetric[];
+  punchCard?: PunchCardItem[];
+  languagesBreakdown?: LanguageBreakdownItem[];
   lastSyncAt: string;
   lastSyncAttemptAt?: number;
   lastAccessedAt?: number;
@@ -45,6 +57,7 @@ export interface GitHubStoreState {
   syncStatus: SyncStatus;
   syncError?: string;
   telemetryStatus: TelemetrySyncStatus;
+  isCachedFromDb?: boolean;
 }
 
 class BoundedCache<K, V> {
@@ -167,9 +180,44 @@ export class GitHubService {
   private static activeSyncToken: string | null = null;
   private static activeTogglePromise: Promise<Repository[]> | null = null;
 
+  // Snapshot & Metrik Önbelleği (Cold-start ve Instant Startup için)
+  private static cachedDailyBrief: TodayBriefItem[] | null = null;
+  private static cachedDeveloperPersona: DeveloperPersona | null = null;
+  private static cachedHotspots: FileHotspot[] | null = null;
+  private static cachedRisks: EngineeringRisk[] | null = null;
+  private static cachedHealthScore: EngineeringHealthScore | null = null;
+
+  public static getCachedDailyBrief(): TodayBriefItem[] | null {
+    return this.cachedDailyBrief;
+  }
+  public static setCachedDailyBrief(brief: TodayBriefItem[]): void {
+    this.cachedDailyBrief = brief;
+  }
+  public static getCachedDeveloperPersona(): DeveloperPersona | null {
+    return this.cachedDeveloperPersona;
+  }
+  public static setCachedDeveloperPersona(persona: DeveloperPersona): void {
+    this.cachedDeveloperPersona = persona;
+  }
+  public static getCachedHotspots(): FileHotspot[] | null {
+    return this.cachedHotspots;
+  }
+  public static getCachedRisks(): EngineeringRisk[] | null {
+    return this.cachedRisks;
+  }
+  public static getCachedHealthScore(): EngineeringHealthScore | null {
+    return this.cachedHealthScore;
+  }
+
   // Commit ve PR detay önbelleği (Bellek sızıntısı ve rate limit tükenmesini önler)
   private static commitDetailCache = new BoundedCache<string, GitHubApiCommitDetail>(1000);
   private static prDetailCache = new BoundedCache<string, GitHubApiPRDetail>(500);
+  private static languagesCache = new BoundedCache<string, Record<string, number>>(200);
+  private static ciRunsCache = new BoundedCache<string, RepositoryCiRun | null>(200);
+  private static releasesCache = new BoundedCache<string, RepositoryRelease | null>(200);
+  private static branchesCountCache = new BoundedCache<string, number>(200);
+  private static punchCardCache = new BoundedCache<string, PunchCardItem[]>(200);
+  private static treeCache = new BoundedCache<string, string[]>(50);
 
   // GitHub API Rate Limit durum takibi
   private static rateLimitStatus: RateLimitStatus = {
@@ -209,6 +257,8 @@ export class GitHubService {
       commits: [],
       pullRequests: [],
       issues: [],
+      punchCard: [],
+      languagesBreakdown: [],
       lastSyncAt: '',
       lastAccessedAt: Date.now(),
       isSyncing: false,
@@ -318,6 +368,142 @@ export class GitHubService {
       throw new Error('GitHub isteği sırasında bilinmeyen bir hata oluştu.');
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  public static async fetchLanguages(owner: string, repoName: string, headers: Record<string, string>): Promise<Record<string, number>> {
+    const key = `${owner}/${repoName}`;
+    if (this.languagesCache.has(key)) return this.languagesCache.get(key)!;
+    try {
+      const data = await this.fetchJson<Record<string, number>>(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/languages`,
+        headers
+      );
+      const result = data && typeof data === 'object' ? data : {};
+      this.languagesCache.set(key, result);
+      return result;
+    } catch {
+      return {};
+    }
+  }
+
+  public static async fetchLatestCiRun(owner: string, repoName: string, headers: Record<string, string>): Promise<RepositoryCiRun | null> {
+    const key = `${owner}/${repoName}`;
+    if (this.ciRunsCache.has(key)) return this.ciRunsCache.get(key) || null;
+    try {
+      const data = await this.fetchJson<{ workflow_runs?: any[] }>(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/actions/runs?per_page=1`,
+        headers
+      );
+      const run = data?.workflow_runs?.[0];
+      if (!run) {
+        this.ciRunsCache.set(key, null);
+        return null;
+      }
+      const ciRun: RepositoryCiRun = {
+        name: String(run.name || 'CI'),
+        status: String(run.status || 'completed'),
+        conclusion: run.conclusion ? String(run.conclusion) : undefined,
+        html_url: run.html_url ? String(run.html_url) : undefined,
+        updated_at: run.updated_at ? String(run.updated_at) : undefined,
+      };
+      this.ciRunsCache.set(key, ciRun);
+      return ciRun;
+    } catch {
+      return null;
+    }
+  }
+
+  public static async fetchLatestRelease(owner: string, repoName: string, headers: Record<string, string>): Promise<RepositoryRelease | null> {
+    const key = `${owner}/${repoName}`;
+    if (this.releasesCache.has(key)) return this.releasesCache.get(key) || null;
+    try {
+      const data = await this.fetchJson<any[]>(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/releases?per_page=1`,
+        headers
+      );
+      const rel = Array.isArray(data) ? data[0] : null;
+      if (!rel) {
+        this.releasesCache.set(key, null);
+        return null;
+      }
+      const release: RepositoryRelease = {
+        tag_name: String(rel.tag_name || ''),
+        name: rel.name ? String(rel.name) : undefined,
+        published_at: String(rel.published_at || rel.created_at || ''),
+        html_url: rel.html_url ? String(rel.html_url) : undefined,
+      };
+      this.releasesCache.set(key, release);
+      return release;
+    } catch {
+      return null;
+    }
+  }
+
+  public static async fetchBranchesCount(owner: string, repoName: string, headers: Record<string, string>): Promise<number> {
+    const key = `${owner}/${repoName}`;
+    if (this.branchesCountCache.has(key)) return this.branchesCountCache.get(key) || 1;
+    try {
+      const branches = await this.fetchJson<any[]>(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/branches?per_page=30`,
+        headers
+      );
+      const count = Array.isArray(branches) ? branches.length : 1;
+      this.branchesCountCache.set(key, count);
+      return count;
+    } catch {
+      return 1;
+    }
+  }
+
+  public static async fetchPunchCard(owner: string, repoName: string, headers: Record<string, string>): Promise<PunchCardItem[]> {
+    const key = `${owner}/${repoName}`;
+    if (this.punchCardCache.has(key)) return this.punchCardCache.get(key) || [];
+    try {
+      const data = await this.fetchJson<number[][]>(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/stats/punch_card`,
+        headers
+      );
+      if (!Array.isArray(data)) return [];
+      const items: PunchCardItem[] = data.map(([day, hour, count]) => ({
+        day: Number(day) || 0,
+        hour: Number(hour) || 0,
+        count: Number(count) || 0,
+      }));
+      this.punchCardCache.set(key, items);
+      return items;
+    } catch {
+      return [];
+    }
+  }
+
+  public static async fetchRepositoryTree(owner: string, repoName: string, defaultBranch = 'main'): Promise<string[]> {
+    const state = this.getState();
+    const token = state.token || process.env.GITHUB_TOKEN;
+    if (!token) return [];
+    const cacheKey = `${owner}/${repoName}/${defaultBranch}`;
+    if (this.treeCache.has(cacheKey)) {
+      return this.treeCache.get(cacheKey)!;
+    }
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'DevControl-AI-Platform',
+    };
+    try {
+      const data = await this.fetchJson<{ tree?: Array<{ path?: string; type?: string }> }>(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/git/trees/${encodeURIComponent(defaultBranch)}?recursive=1`,
+        headers
+      );
+      const paths = (data?.tree || [])
+        .filter((item) => typeof item.path === 'string')
+        .map((item) => item.path as string)
+        .slice(0, 150);
+      this.treeCache.set(cacheKey, paths);
+      return paths;
+    } catch (err) {
+      console.warn(`[DevControl AI] ${repoName} dosya ağacı alınamadı:`, err);
+      return [];
     }
   }
 
@@ -473,9 +659,70 @@ export class GitHubService {
       state.isSyncing = false;
       state.syncStatus = state.telemetryStatus.status === 'partial' ? 'partial' : 'ready';
       state.syncError = state.telemetryStatus.lastError;
+      state.isCachedFromDb = false;
+
+      // Firestore'a kalıcı ve anti-bloat tekil snapshot kaydı
+      try {
+        const activeRepos = state.repositories.filter((r) => r.selected_for_analysis);
+        const activeRepoNames = new Set(activeRepos.map((r) => r.name));
+        const activeCommits = state.commits.filter((c) => activeRepoNames.has(c.repo_name));
+        const activePRs = state.pullRequests.filter((p) => activeRepoNames.has(p.repo_name));
+        const activeIssues = state.issues.filter((i) => activeRepoNames.has(i.repo_name));
+        const hotspots = HotspotEngine.analyzeHotspots(activeCommits);
+        const risks = RiskEngine.analyzeRisks(activeRepos, activeCommits, activePRs, activeIssues, hotspots);
+        const health = HealthEngine.calculateHealth(
+          activeRepos,
+          activeCommits,
+          activePRs,
+          activeIssues,
+          undefined,
+          state.telemetryStatus.status === 'partial' ? 'partial' : undefined,
+        );
+
+        this.cachedHotspots = hotspots;
+        this.cachedRisks = risks;
+        this.cachedHealthScore = health;
+
+        await FirestoreService.saveLatestSnapshot({
+          lastSyncAt: state.lastSyncAt,
+          user: state.user,
+          repositories: state.repositories,
+          commits: state.commits.map((c) => ({
+            sha: c.sha,
+            message: c.message,
+            author: c.author,
+            author_name: c.author_name,
+            author_avatar: c.author_avatar,
+            date: c.date,
+            additions: c.additions,
+            deletions: c.deletions,
+            total_changes: c.total_changes,
+            files_changed: c.files_changed,
+            is_bug_fix: c.is_bug_fix,
+            ai_category: c.ai_category,
+            ai_reasoning: c.ai_reasoning,
+            ai_confidence: c.ai_confidence,
+            repo_name: c.repo_name,
+            affected_files: (c.affected_files || []).slice(0, 10),
+          })),
+          pullRequests: state.pullRequests,
+          issues: state.issues,
+          healthScore: health,
+          hotspots,
+          risks,
+          dailyBrief: this.cachedDailyBrief || [],
+          developerPersona: this.cachedDeveloperPersona || null,
+          punchCard: state.punchCard || [],
+          languagesBreakdown: state.languagesBreakdown || [],
+          commitsCount: state.commits.length,
+          pullRequestsCount: state.pullRequests.length,
+        });
+      } catch (saveErr) {
+        console.warn('Firestore snapshot kaydedilemedi:', saveErr);
+      }
       
       return state;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (previousState.token) state.token = previousState.token;
       else delete state.token;
       state.user = previousState.user;
@@ -486,9 +733,10 @@ export class GitHubService {
       state.lastSyncAt = previousState.lastSyncAt;
       state.isSyncing = false;
       state.syncStatus = 'error';
-      state.syncError = err?.message || 'GitHub bağlantısı sırasında hata oluştu.';
+      const errMsg = err instanceof Error ? err.message : String(err);
+      state.syncError = errMsg || 'GitHub bağlantısı sırasında hata oluştu.';
       state.telemetryStatus = previousState.telemetryStatus;
-      console.error('Canlı GitHub verisi senkronize edilirken hata:', err?.message || err);
+      console.error('Canlı GitHub verisi senkronize edilirken hata:', errMsg || err);
       throw err;
     }
   }
@@ -515,6 +763,7 @@ export class GitHubService {
     const allCommits: CommitMetric[] = [];
     const allPRs: PullRequestMetric[] = [];
     const allIssues: IssueMetric[] = [];
+    const allPunchCardItems: PunchCardItem[] = [];
     const failedRepositoryNames: string[] = [];
     const errors: string[] = [];
     let completedRepositories = 0;
@@ -533,7 +782,7 @@ export class GitHubService {
     const sinceTimestamp = Date.now() - TELEMETRY_WINDOW_DAYS * MS_PER_DAY;
     const since = new Date(sinceTimestamp).toISOString();
 
-    const CHUNK_SIZE = 5;
+    const CHUNK_SIZE = 6;
     for (let i = 0; i < selectedRepos.length; i += CHUNK_SIZE) {
       const chunk = selectedRepos.slice(i, i + CHUNK_SIZE);
       await Promise.allSettled(
@@ -553,7 +802,7 @@ export class GitHubService {
             }
 
             const commitRecords: { summary: GitHubApiCommitSummary; detail: GitHubApiCommitDetail }[] = [];
-            const COMMIT_DETAIL_CHUNK_SIZE = 5;
+            const COMMIT_DETAIL_CHUNK_SIZE = 6;
             for (let commitIndex = 0; commitIndex < ghCommits.length; commitIndex += COMMIT_DETAIL_CHUNK_SIZE) {
               const commitChunk = ghCommits.slice(commitIndex, commitIndex + COMMIT_DETAIL_CHUNK_SIZE);
               const detailedChunk = await Promise.all(commitChunk.map(async (summary: GitHubApiCommitSummary) => {
@@ -607,6 +856,8 @@ export class GitHubService {
                 ? asNonNegativeNumber(detail.stats.deletions)
                 : fileDeletions;
 
+              const initialClassification = CommitSemanticClassifier.classifyByConvention(msg, sha);
+
               allCommits.push({
                 sha,
                 message: msg,
@@ -620,7 +871,10 @@ export class GitHubService {
                 files_changed: files.length,
                 affected_files: files.map((file) => file.filename),
                 files,
-                is_bug_fix: false, // Gemini yapay zekası anlamsal olarak sınıflandıracaktır
+                is_bug_fix: initialClassification.isBugFix,
+                ai_category: initialClassification.category,
+                ai_reasoning: initialClassification.reasoning,
+                ai_confidence: initialClassification.confidence,
                 repo_name: repo.name,
               });
             });
@@ -639,7 +893,7 @@ export class GitHubService {
               return Number.isFinite(updatedTime) && updatedTime >= sinceTimestamp;
             });
             const prRecords: { summary: GitHubApiPRSummary; detail: GitHubApiPRDetail }[] = [];
-            const PR_DETAIL_CHUNK_SIZE = 5;
+            const PR_DETAIL_CHUNK_SIZE = 6;
             for (let prIndex = 0; prIndex < relevantPRs.length; prIndex += PR_DETAIL_CHUNK_SIZE) {
               const prChunk = relevantPRs.slice(prIndex, prIndex + PR_DETAIL_CHUNK_SIZE);
               const detailedChunk = await Promise.all(prChunk.map(async (summary: GitHubApiPRSummary) => {
@@ -678,7 +932,7 @@ export class GitHubService {
               const createdTime = new Date(createdAt).getTime();
               const closedTime = closedAt ? new Date(closedAt).getTime() : Number.NaN;
               const cycleTimeHours = Number.isFinite(createdTime) && Number.isFinite(closedTime)
-                ? Math.max(1, Math.round((closedTime - createdTime) / MS_PER_HOUR))
+                ? Math.max(0, Math.round((closedTime - createdTime) / MS_PER_HOUR))
                 : undefined;
 
               allPRs.push({
@@ -741,6 +995,27 @@ export class GitHubService {
                 is_bug: isBug,
               });
             });
+
+            // Ek telemetri verilerini çek (Diller, CI/CD, Sürümler, Dallar, Punch Card)
+            try {
+              const [languages, latestCi, latestRelease, branchesCount, punchCardItems] = await Promise.all([
+                this.fetchLanguages(owner, repoName, headers),
+                this.fetchLatestCiRun(owner, repoName, headers),
+                this.fetchLatestRelease(owner, repoName, headers),
+                this.fetchBranchesCount(owner, repoName, headers),
+                this.fetchPunchCard(owner, repoName, headers),
+              ]);
+
+              repo.languages = languages;
+              repo.latest_ci_run = latestCi || undefined;
+              repo.latest_release = latestRelease || undefined;
+              repo.branches_count = branchesCount;
+              if (punchCardItems.length > 0) {
+                allPunchCardItems.push(...punchCardItems);
+              }
+            } catch (extraErr) {
+              console.warn(`${repo.name} için ek telemetri çekilirken uyarı:`, extraErr);
+            }
           } catch (repoErr: unknown) {
             const message = repoErr instanceof Error ? repoErr.message : 'Bilinmeyen GitHub telemetri hatası.';
             failedRepositoryNames.push(repo.name);
@@ -759,6 +1034,40 @@ export class GitHubService {
         })
       );
     }
+
+    // Punch card verilerini birleştir (0-6 gün, 0-23 saat)
+    const punchCardMap = new Map<string, number>();
+    for (const item of allPunchCardItems) {
+      const key = `${item.day}_${item.hour}`;
+      punchCardMap.set(key, (punchCardMap.get(key) || 0) + item.count);
+    }
+    const mergedPunchCard: PunchCardItem[] = [];
+    for (let d = 0; d < 7; d++) {
+      for (let h = 0; h < 24; h++) {
+        const key = `${d}_${h}`;
+        mergedPunchCard.push({ day: d, hour: h, count: punchCardMap.get(key) || 0 });
+      }
+    }
+    state.punchCard = mergedPunchCard;
+
+    // Tüm seçili repoların dillerini topla ve yüzde dağılımı hesapla
+    const totalBytesByLang: Record<string, number> = {};
+    let grandTotalBytes = 0;
+    for (const r of selectedRepos) {
+      if (r.languages) {
+        for (const [lang, bytes] of Object.entries(r.languages)) {
+          totalBytesByLang[lang] = (totalBytesByLang[lang] || 0) + bytes;
+          grandTotalBytes += bytes;
+        }
+      }
+    }
+    state.languagesBreakdown = Object.entries(totalBytesByLang)
+      .map(([name, bytes]) => ({
+        name,
+        bytes,
+        percentage: grandTotalBytes > 0 ? Math.round((bytes / grandTotalBytes) * 100) : 0,
+      }))
+      .sort((a, b) => b.bytes - a.bytes);
 
     // Gemini destekli anlamsal commit sınıflandırması (Toplu batch işleme & SHA immutability cache)
     if (allCommits.length > 0) {
@@ -811,17 +1120,25 @@ export class GitHubService {
 
   private static async toggleRepoSelectionInternal(repoId: string): Promise<Repository[]> {
     const state = this.getState();
-    const targetRepo = state.repositories.find((repository) => repository.id === repoId);
+    const normalizedId = String(repoId || '').trim();
+    const targetRepo = state.repositories.find(
+      (repository) =>
+        repository.id === normalizedId ||
+        repository.id === `repo_${normalizedId}` ||
+        `repo_${repository.id}` === normalizedId ||
+        repository.name.toLowerCase() === normalizedId.toLowerCase(),
+    );
     if (!targetRepo) {
       const error = new Error('Seçilmeye çalışılan depo bulunamadı.') as Error & { status?: number };
       error.status = 404;
       throw error;
     }
 
+    const actualId = targetRepo.id;
     state.repositories = state.repositories.map((r) =>
-      r.id === repoId ? { ...r, selected_for_analysis: !r.selected_for_analysis } : r
+      r.id === actualId ? { ...r, selected_for_analysis: !r.selected_for_analysis } : r
     );
-    if (state.repositories.some((repository) => repository.id === repoId && repository.selected_for_analysis)) {
+    if (state.repositories.some((repository) => repository.id === actualId && repository.selected_for_analysis)) {
       state.isSyncing = true;
       state.syncStatus = 'syncing';
       state.syncError = undefined;
@@ -864,15 +1181,46 @@ export class GitHubService {
     return this.getState().repositories;
   }
 
-  public static async ensureSynced(): Promise<GitHubStoreState> {
+  public static async ensureSynced(force = false): Promise<GitHubStoreState> {
     const state = this.getState();
     if (this.activeSyncPromise) {
       await this.activeSyncPromise;
       return this.getState();
     }
 
-    if (state.syncStatus === 'ready' || state.syncStatus === 'partial') {
+    if (!force && (state.syncStatus === 'ready' || state.syncStatus === 'partial')) {
       return state;
+    }
+
+    // 1. ADIM: Zorunlu yenileme değilse ve bellekte veri yoksa önce Firestore Snapshot'ı oku (Instant Cold-Start)
+    if (!force && !state.lastSyncAt) {
+      try {
+        const snapshot = await FirestoreService.getLatestSnapshot();
+        if (snapshot && Array.isArray(snapshot.repositories) && snapshot.repositories.length > 0) {
+          state.user = snapshot.user || state.user;
+          state.repositories = snapshot.repositories;
+          state.commits = snapshot.commits || [];
+          state.pullRequests = snapshot.pullRequests || [];
+          state.issues = snapshot.issues || [];
+          state.punchCard = snapshot.punchCard || [];
+          state.languagesBreakdown = snapshot.languagesBreakdown || [];
+          state.lastSyncAt = snapshot.lastSyncAt;
+          state.syncStatus = 'ready';
+          state.isCachedFromDb = true;
+          state.telemetryStatus = this.createTelemetryStatus('ready', state.repositories.length, state.repositories.length);
+
+          if (snapshot.dailyBrief) this.cachedDailyBrief = snapshot.dailyBrief;
+          if (snapshot.developerPersona) this.cachedDeveloperPersona = snapshot.developerPersona;
+          if (snapshot.hotspots) this.cachedHotspots = snapshot.hotspots;
+          if (snapshot.risks) this.cachedRisks = snapshot.risks;
+          if (snapshot.healthScore) this.cachedHealthScore = snapshot.healthScore;
+
+          console.log(`⚡ [GitHubService] Firestore'dan kayıtlı snapshot yüklendi! (${snapshot.repositories.length} repo, Son Eşitleme: ${snapshot.lastSyncAt})`);
+          return state;
+        }
+      } catch (cacheErr) {
+        console.warn('Firestore snapshot okuma uyarısı:', cacheErr);
+      }
     }
 
     const token = state.token || process.env.GITHUB_TOKEN;
@@ -885,7 +1233,7 @@ export class GitHubService {
     return state;
   }
 
-  public static async syncRepositories(): Promise<GitHubStoreState> {
+  public static async syncRepositories(force = false): Promise<GitHubStoreState> {
     if (this.activeSyncPromise) {
       return this.activeSyncPromise;
     }
@@ -911,16 +1259,23 @@ export class GitHubService {
     const commits = state.commits.filter((c) => activeRepoNames.has(c.repo_name));
     const pullRequests = state.pullRequests.filter((p) => activeRepoNames.has(p.repo_name));
     const issues = state.issues.filter((i) => activeRepoNames.has(i.repo_name));
-    const hotspots = HotspotEngine.analyzeHotspots(commits);
-    const risks = RiskEngine.analyzeRisks(activeRepos, commits, pullRequests, issues, hotspots);
-    const health = HealthEngine.calculateHealth(
-      activeRepos,
-      commits,
-      pullRequests,
-      issues,
-      undefined,
-      state.telemetryStatus.status === 'partial' ? 'partial' : undefined,
-    );
+    
+    const hotspots = (commits.length > 0)
+      ? HotspotEngine.analyzeHotspots(commits)
+      : (this.cachedHotspots || []);
+    const risks = (commits.length > 0)
+      ? RiskEngine.analyzeRisks(activeRepos, commits, pullRequests, issues, hotspots)
+      : (this.cachedRisks || []);
+    const health = (commits.length > 0)
+      ? HealthEngine.calculateHealth(
+          activeRepos,
+          commits,
+          pullRequests,
+          issues,
+          undefined,
+          state.telemetryStatus.status === 'partial' ? 'partial' : undefined,
+        )
+      : (this.cachedHealthScore || HealthEngine.calculateHealth(activeRepos, [], [], []));
 
     return {
       state,
@@ -932,6 +1287,8 @@ export class GitHubService {
       hotspots,
       risks,
       health,
+      punchCard: state.punchCard || [],
+      languagesBreakdown: state.languagesBreakdown || [],
     };
   }
 }

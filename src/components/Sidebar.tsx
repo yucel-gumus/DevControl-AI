@@ -42,7 +42,7 @@ export const Sidebar: React.FC<Props> = ({
     },
     {
       id: 'hotspots' as ActiveTab,
-      label: 'Sıcak Noktalar & Riskler',
+      label: 'Kritik Dosyalar & Riskler',
       icon: Flame,
       badge: totalIssuesCount > 0 ? totalIssuesCount : undefined,
       description: 'Kod Kalitesi & Risk Radarı',

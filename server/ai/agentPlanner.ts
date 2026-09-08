@@ -32,10 +32,14 @@ export class AgentPlanner {
 
     const lowerQ = question.toLowerCase();
 
-    // Sorguda belirli bir depo ismi geçiyor mu tespit et
+    // Sorguda belirli bir depo ismi geçiyor mu tespit et (kelime sınırları ile hatalı pozitifleri önle)
     const matchedRepo = context.repositories.find((r) => {
-      const rName = r.name.toLowerCase();
-      return lowerQ.includes(rName) || lowerQ.includes(rName.replace(/[-_]/g, ' ')) || lowerQ.includes(rName.replace(/[-_]/g, ''));
+      const rName = r.name.toLowerCase().trim();
+      if (!rName) return false;
+      const escaped = rName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const spaced = escaped.replace(/[-_]/g, '[-_\\s]');
+      const pattern = new RegExp(`(^|[^a-z0-9_-])${spaced}([^a-z0-9_-]|$)`, 'i');
+      return pattern.test(lowerQ);
     });
     const matchedRepoCommits = matchedRepo
       ? context.commits.filter((commit) => commit.repo_name.toLowerCase() === matchedRepo.name.toLowerCase())
@@ -96,11 +100,11 @@ export class AgentPlanner {
           details: `Sorgu filtreleriyle eşleşen yapılandırılmış veri kayıtları getirildi`,
           durationMs: Date.now() - stepStart,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         traceSteps.push({
           step: `'${toolCall.name}' aracı başarısız oldu`,
           status: 'failed',
-          details: err.message,
+          details: err instanceof Error ? err.message : String(err),
           durationMs: Date.now() - stepStart,
         });
       }
@@ -116,7 +120,7 @@ export class AgentPlanner {
             saglikSkoru: matchedRepoHealth?.hasData ? matchedRepoHealth.overallScore : null,
             riskSeviyesi: matchedRepo.risk_level,
             dil: matchedRepo.language,
-            acikSorunlar: matchedRepo.open_issues_count,
+            forkSayisi: matchedRepo.forks_count,
             yildizSayisi: matchedRepo.stargazers_count,
             sonGuncelleme: matchedRepo.updated_at,
           }
@@ -125,7 +129,8 @@ export class AgentPlanner {
         ad: r.name,
         riskSeviyesi: r.risk_level,
         dil: r.language,
-        acikSorunlar: r.open_issues_count,
+        forkSayisi: r.forks_count,
+        yildizSayisi: r.stargazers_count,
       })),
       telemetriDurumu: context.healthScore?.dataStatus || 'no_data',
       aracSonuclari: toolResults,
@@ -162,20 +167,18 @@ TEMEL PRENSİPLER:
 3. Sayısal ölçümleri (commit sayıları, kod dalgalanması satırları, PR durumları, sağlık skorları) kanıt olarak vurgula.
 4. DİL: Yanıtının tamamı %100 profesyonel, akıcı, zengin ve TÜRKÇE olmalıdır. Asla İngilizce başlık veya kalıp kullanma.
 
-YAPI VE FORMAT:
-Yanıtını Markdown formatında aşağıdaki bölümler halinde yapılandır:
+YAPI VE FORMAT YÖNERGESİ:
+1. SPESİFİK METRİK VEYA TEKİL SORULAR İÇİN (Örn: "kaç commit var?", "hangi diller?", "sağlık puanı kaç?", "en son commit ne zaman?", "kaç issue var?"):
+   - Yanıtına DOĞRUDAN, NET ve KESİN olarak sorunun cevabını vererek başla (Örn: "**\`${matchedRepo ? matchedRepo.name : 'depo'}\` deposunda doğrulanmış X commit bulunmaktadır.**").
+   - Ardından ilgili telemetri kanıtlarını (tarihleri, commit mesajları, yazarları vb.) düzenli bir liste veya maddeleme halinde sun.
+   - Kullanıcı genel bir analiz istemediği sürece gereksiz yere uzun yol haritası veya genel mimari nutuk yazma; odaklı, net ve kanıta dayalı kal.
 
-### 🏛️ Mimari Sağlık ve Durum Analizi
-(Deponun veya konunun genel mühendislik durumu, sağlık skoru, kod tabanı dağılımı ve aktivite temposu)
-
-### 📊 Doğrulanmış Telemetri Kanıtları
-(Commit frekansı, dosya değişimleri, PR/Issue durumları ve ölçülen somut metrikler)
-
-### ⚠️ Risk Değerlendirmesi & Sıcak Noktalar
-(Varsa tespit edilen kod sıcak noktaları, mimari darboğazlar veya stabilite riskleri)
-
-### 🛠️ Önerilen Mühendislik Yol Haritası
-(Geliştirici veya ekip için somut, uygulanabilir ve önceliklendirilmiş aksiyon maddeleri)
+2. GENEL ANALİZ VEYA MİMARİ DEĞERLENDİRME İSTEYEN SORULAR İÇİN (Örn: "kodları analiz et", "riskleri incele", "sağlık durumu nasıl?", "depoyu değerlendir"):
+   - Yanıtını aşağıdaki 4 bölümlü zengin Markdown yapısıyla kurgula:
+     ### 🏛️ Mimari Sağlık ve Durum Analizi
+     ### 📊 Doğrulanmış Telemetri Kanıtları
+     ### ⚠️ Risk Değerlendirmesi & Kritik Dosyalar
+     ### 🛠️ Önerilen Mühendislik Yol Haritası
 
 KULLANICI SORUSU: "${question}"
 
@@ -185,7 +188,7 @@ ${JSON.stringify(compactProjection, null, 2)}`;
     if (!queryHasTelemetry) {
       assistantText = matchedRepo
         ? `### 📡 \`${matchedRepo.name}\` için GitHub Telemetrisi Bekleniyor\n\n\`${matchedRepo.name}\` deposu bağlı olsa da analiz penceresinde bu depoya ait doğrulanmış commit, PR veya issue kaydı bulunmuyor. Sağlık skoru ve risk analizi üretmek için lütfen GitHub verilerini yeniden eşitleyin.`
-        : `### 📡 GitHub Telemetrisi Bekleniyor\n\nHenüz doğrulanmış GitHub commit, PR veya issue verisi bulunmuyor. Sağlık skoru, sıcak nokta ve risk analizi üretmek için lütfen **Depolar & Bağlantı** bölümünden GitHub hesabınızı bağlayın ve verileri eşitleyin.`;
+        : `### 📡 GitHub Telemetrisi Bekleniyor\n\nHenüz doğrulanmış GitHub commit veya PR verisi bulunmuyor. Sağlık skoru, kritik dosya ve risk analizi üretmek için lütfen **Depolar & Bağlantı** bölümünden GitHub hesabınızı bağlayın ve verileri eşitleyin.`;
     } else {
       const aiAnswer = await generateGeminiText(prompt);
       if (aiAnswer) {
@@ -204,12 +207,12 @@ ${JSON.stringify(compactProjection, null, 2)}`;
         source: `Doğrulanmış GitHub Telemetrisi / ${matchedRepo.name}`,
       });
       evidenceItems.push({
-        metric: 'Açık Sorun Sayısı (Issues)',
-        value: `${matchedRepo.open_issues_count} açık sorun`,
+        metric: 'Yıldız & Fork Sayısı (Stars / Forks)',
+        value: `${matchedRepo.stargazers_count} Yıldız · ${matchedRepo.forks_count} Fork`,
         source: `GitHub API / ${matchedRepo.name}`,
       });
     } else if (matchedRepo && hasTelemetry) {
-      facts.push(`${matchedRepo.name} deposu için analiz penceresinde doğrulanmış commit, PR veya issue kaydı bulunamadı.`);
+      facts.push(`${matchedRepo.name} deposu için analiz penceresinde doğrulanmış commit veya PR kaydı bulunamadı.`);
     }
 
     if (toolResults['get_hotspots']) {
@@ -221,7 +224,7 @@ ${JSON.stringify(compactProjection, null, 2)}`;
       const topHotspots = hotspotsList.slice(0, 3);
       topHotspots.forEach((h) => {
         const fileName = (h.path && typeof h.path === 'string') ? (h.path.split('/').pop() || h.path) : 'modül';
-        facts.push(`${h.repo_name}/${h.path} sıcak noktası: ${h.modifications_count} değişiklik, ${h.bug_fix_commits_count} hata düzeltmesi, ${h.code_churn} satır dalgalanma.`);
+        facts.push(`${h.repo_name}/${h.path} kritik dosyası: ${h.modifications_count} değişiklik, ${h.bug_fix_commits_count} hata düzeltmesi, ${h.code_churn} satır dalgalanma.`);
         evidenceItems.push({
           metric: `${fileName} Dalgalanması`,
           value: `${h.code_churn} satır (${h.modifications_count} commit)`,
@@ -325,22 +328,28 @@ ${JSON.stringify(compactProjection, null, 2)}`;
       const repoRisks = topRisks.filter((r) => r.affectedRepository.toLowerCase() === matchedRepo.name.toLowerCase() || (r.repo_name && r.repo_name.toLowerCase() === matchedRepo.name.toLowerCase()));
       const repoPRs = context.pullRequests.filter((p) => p.repo_name.toLowerCase() === matchedRepo.name.toLowerCase());
 
+      const criticalHotspots = repoHotspots.slice(0, 4);
+      const hotspotListStr = criticalHotspots.length > 0
+        ? criticalHotspots.map((h) => `\`${h.path}\` (${h.modifications_count} değişiklik, ${h.code_churn} satır dalgalanma)`).join(', ')
+        : 'Kritik dosya tespit edilmedi.';
+
       return `### 📡 Doğrulanmış Telemetri Kaydı: \`${matchedRepo.name}\`
 *(Yapay zeka analiz motoruna şu anda ulaşılamadı. Depodan çekilen güncel telemetri kayıtları aşağıda listelenmiştir.)*
 
 • **İncelenen Commit Hacmi:** ${repoCommits.length} commit
 • **Çekme İstekleri (PR):** ${repoPRs.length} PR (${repoPRs.filter((p) => p.state === 'open').length} açık)
-• **Açık Sorun (Issue) Sayısı:** ${matchedRepo.open_issues_count}
-• **Tespit Edilen Sıcak Noktalar:** ${repoHotspots.length > 0 ? repoHotspots.map((h) => `\`${h.path}\` (${h.modifications_count} değişiklik, ${h.code_churn} satır)`).join(', ') : 'Kritik sıcak nokta tespit edilmedi.'}
+• **Yıldız & Fork Sayısı:** ${matchedRepo.stargazers_count} Yıldız · ${matchedRepo.forks_count} Fork
+• **Öne Çıkan Kritik Dosyalar (İlk ${criticalHotspots.length}):** ${hotspotListStr}
 • **Aktif Riskler:** ${repoRisks.length > 0 ? repoRisks.map((r) => `[${r.severity}] ${r.title}`).join('; ') : 'Aktif risk bulunmuyor.'}`;
     }
 
+    const criticalGlobalHotspots = topHotspots.slice(0, 4);
     return `### 📡 Doğrulanmış Sistem Telemetri Kaydı
 *(Yapay zeka analiz motoruna şu anda ulaşılamadı. Doğrudan ölçülen sistem telemetri kayıtları aşağıda listelenmiştir.)*
 
 • **Genel Sağlık Skoru:** ${health?.hasData ? `${health.overallScore} / 100 (${health.grade})` : 'Hesaplanıyor'}
 • **Toplam İncelenen Commit:** ${context.commits.length} commit
-• **Toplam Tespit Edilen Sıcak Nokta:** ${topHotspots.length} dosya
+• **Öne Çıkan Kritik Dosyalar (İlk ${criticalGlobalHotspots.length}):** ${criticalGlobalHotspots.length > 0 ? criticalGlobalHotspots.map((h) => `\`${h.repo_name}/${h.path}\` (${h.code_churn} satır)`).join(', ') : 'Tespit edilmedi'}
 • **Aktif Mühendislik Riski:** ${topRisks.length} adet`;
   }
 }

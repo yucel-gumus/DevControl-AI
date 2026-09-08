@@ -1,4 +1,4 @@
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 export interface ApiClientOptions extends RequestInit {
   timeoutMs?: number;

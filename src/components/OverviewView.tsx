@@ -13,17 +13,14 @@ import {
   Award,
   Target,
   CheckCircle2,
+  Star,
+  GitFork,
+  Clock,
+  Code2,
 } from 'lucide-react';
 import { useDeveloperPersona } from '../hooks/useMetrics.js';
 import { PRIORITY_TR_MAP } from '../constants.js';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { formatDate } from '../utils/formatters.js';
 import {
   Repository,
   EngineeringHealthScore,
@@ -32,7 +29,8 @@ import {
   TodayBriefItem,
 } from '../types.js';
 import { ExplainWhyData } from './ExplainWhyModal.js';
-import { CHART_THEME } from '../theme.js';
+
+const ActivityChart = React.lazy(() => import('./ActivityChart.js'));
 
 interface Props {
   repositories: Repository[];
@@ -40,7 +38,7 @@ interface Props {
   risks: EngineeringRisk[];
   hotspots: FileHotspot[];
   dailyBrief: TodayBriefItem[];
-  activityData: any;
+  activityData?: any;
   dailyBriefLoading?: boolean;
   dailyBriefError?: string | null;
   activityLoading?: boolean;
@@ -70,7 +68,7 @@ export const OverviewView: React.FC<Props> = ({
   const activeRepos = repositories.filter((r) => r.selected_for_analysis);
   const hasHealthData = Boolean(healthScore?.hasData);
 
-  const chartData = (Array.isArray(activityData?.timeSeries) ? activityData.timeSeries : []).slice(-14).map((d: any) => ({
+  const chartData = (Array.isArray(activityData?.timeSeries) ? activityData.timeSeries : []).slice(-7).map((d: any) => ({
     date: typeof d?.date === 'string' ? d.date.split('-').slice(1).join('/') : (d?.date ? String(d.date) : ''),
     commits: d?.commits || 0,
     bugFixes: d?.bugFixes || 0,
@@ -78,6 +76,33 @@ export const OverviewView: React.FC<Props> = ({
   }));
 
   const { data: persona, isLoading: isPersonaLoading } = useDeveloperPersona();
+
+  // En Yüksek Etkili Odak Depolar (Son güncellemeye göre sıralı)
+  const candidateRepos = activeRepos.length > 0 ? activeRepos : repositories;
+  const topImpactRepos = [...candidateRepos]
+    .sort((a, b) => new Date(b.pushed_at || b.updated_at).getTime() - new Date(a.pushed_at || a.updated_at).getTime())
+    .slice(0, 4);
+
+  // Dil Dağılımı (Gerçek bayt bazlı)
+  const totalBytesByLang: Record<string, number> = {};
+  let totalBytes = 0;
+  for (const r of activeRepos) {
+    if (r.languages) {
+      for (const [lang, bytes] of Object.entries(r.languages)) {
+        const byteCount = Number(bytes) || 0;
+        totalBytesByLang[lang] = (totalBytesByLang[lang] || 0) + byteCount;
+        totalBytes += byteCount;
+      }
+    }
+  }
+  const topLanguages = Object.entries(totalBytesByLang)
+    .map(([name, bytes]) => ({
+      name,
+      percentage: totalBytes > 0 ? Math.round((bytes / totalBytes) * 100) : 0,
+      sizeKb: Math.round(bytes / 1024),
+    }))
+    .sort((a, b) => b.percentage - a.percentage)
+    .slice(0, 4);
 
   return (
     <div id="overview-view" className="space-y-6 font-sans text-[#231c1a]">
@@ -124,7 +149,7 @@ export const OverviewView: React.FC<Props> = ({
         {/* Özet ve Çalışma Tarzı */}
         <p className="text-xs leading-relaxed text-[#4a3e3b] max-w-4xl font-medium">
           {persona?.summary || (isPersonaLoading
-            ? 'Yapay zeka, son 30 gün içerisindeki tüm commitlerinizi, repo mimarilerinizi ve kod pratiklerinizi analiz ediyor...'
+            ? 'Yapay zeka, son 7 gün içerisindeki tüm commitlerinizi, repo mimarilerinizi ve kod pratiklerinizi analiz ediyor...'
             : 'Depo telemetrisi üzerinden geliştirici kimliği sentezlenmektedir.')}
         </p>
 
@@ -216,13 +241,13 @@ export const OverviewView: React.FC<Props> = ({
           </p>
         </div>
 
-        {/* KPI 3: Sıcak Noktalar */}
+        {/* KPI 3: Kritik Dosyalar */}
         <div
           onClick={() => onNavigateToTab('hotspots')}
           className="p-4 rounded-xl border border-[#a89997] bg-[#cdc1b5] hover:bg-[#cdc1b5]/80 transition-all cursor-pointer shadow-xs group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#4a3e3b]">Sıcak Noktalar</span>
+            <span className="text-xs font-bold text-[#4a3e3b]">Kritik Dosyalar</span>
             <div className="p-1.5 rounded-lg bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 group-hover:scale-105 transition-transform">
               <Flame className="w-4 h-4" />
             </div>
@@ -269,7 +294,7 @@ export const OverviewView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Ana Satır: Günün Bülteni & 14 Günlük Hız Grafiği */}
+      {/* Ana Satır: Günün Bülteni & 7 Günlük Hız Grafiği */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Günün Mühendislik Bülteni */}
         <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-3 shadow-xs flex flex-col justify-between">
@@ -349,13 +374,13 @@ export const OverviewView: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 14 Günlük Hız Grafiği */}
+        {/* 7 Günlük Hız Grafiği */}
         <div className="lg:col-span-2 p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-4 shadow-xs">
           <div className="flex items-center justify-between border-b border-[#a89997] pb-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-[#231c1a]" />
               <h3 className="text-xs font-bold text-[#231c1a]">
-                Son 14 Günlük Aktivite & Hız
+                Son 7 Günlük Aktivite & Hız
               </h3>
             </div>
             <div className="flex items-center gap-4 text-xs">
@@ -381,64 +406,124 @@ export const OverviewView: React.FC<Props> = ({
               </div>
             ) : chartData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-xs text-[#6e5f5c] text-center">
-                Son 14 günde gösterilecek aktivite bulunmuyor.
+                Son 7 günde gösterilecek aktivite bulunmuyor.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="commitGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f9b88e" stopOpacity={0.9} />
-                      <stop offset="95%" stopColor="#f9b88e" stopOpacity={0.0} />
-                    </linearGradient>
-                    <linearGradient id="bugGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#b9aba9" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#b9aba9" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="date"
-                    stroke="#6e5f5c"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={{ stroke: '#a89997' }}
-                  />
-                  <YAxis
-                    stroke="#6e5f5c"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={{ stroke: '#a89997' }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: CHART_THEME.tooltipBg,
-                      borderColor: CHART_THEME.tooltipBorder,
-                      borderRadius: '8px',
-                      color: CHART_THEME.textInk,
-                      fontSize: '12px',
-                      boxShadow: '0 4px 12px rgba(35, 28, 26, 0.15)',
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="commits"
-                    stroke="#231c1a"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#commitGrad)"
-                    name="Commit Sayısı"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="bugFixes"
-                    stroke="#6e5f5c"
-                    strokeWidth={1.5}
-                    fillOpacity={1}
-                    fill="url(#bugGrad)"
-                    name="Hata Düzeltmeleri"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <React.Suspense
+                fallback={
+                  <div className="h-full flex items-center justify-center text-xs text-[#6e5f5c] animate-pulse">
+                    Grafik bileşeni yükleniyor...
+                  </div>
+                }
+              >
+                <ActivityChart chartData={chartData} />
+              </React.Suspense>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* İkinci Satır: CI/CD Pipeline & Teknoloji Yığını (Languages) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* En Yüksek Etkili Odak Depolar Kartı */}
+        <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-3.5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-[#a89997] pb-3">
+              <div className="flex items-center gap-2">
+                <FolderGit2 className="w-4 h-4 text-[#231c1a]" />
+                <h3 className="text-xs font-bold text-[#231c1a]">En Yüksek Etkili Odak Depolar</h3>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                Aktif Çalışma Alanları
+              </span>
+            </div>
+
+            <div className="space-y-2 pt-2.5">
+              {topImpactRepos.length === 0 ? (
+                <p className="text-xs text-[#6e5f5c] text-center py-6">Aktif proje bulunamadı.</p>
+              ) : (
+                topImpactRepos.map((repo) => (
+                  <div
+                    key={repo.id}
+                    onClick={() => onSelectRepo(repo)}
+                    className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/25 hover:bg-[#b9aba9]/45 transition-all flex items-center justify-between gap-3 cursor-pointer group shadow-2xs"
+                    title="Bu depoyu Kensai AI ile analiz et"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-[#231c1a] group-hover:underline truncate">
+                          {repo.name}
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 font-bold">
+                          {repo.language || 'Kod'}
+                        </span>
+                        {repo.stargazers_count > 0 && (
+                          <span className="text-[10px] font-bold text-[#231c1a] flex items-center gap-0.5">
+                            ⭐ {repo.stargazers_count}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[#4a3e3b] truncate font-medium max-w-xs">
+                        {repo.description || 'Proje açıklaması girilmemiş.'}
+                      </p>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] block text-[#4a3e3b] font-bold">Son Değişiklik</span>
+                      <span className="text-xs font-bold text-[#231c1a]">
+                        {formatDate(repo.pushed_at || repo.updated_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-[#a89997] flex items-center justify-between">
+            <span className="text-[11px] text-[#4a3e3b] font-medium">
+              Toplam {repositories.length} depo izleniyor ({activeRepos.length} aktif seçili)
+            </span>
+            <button
+              onClick={() => onNavigateToTab('repositories')}
+              className="text-xs font-bold text-[#231c1a] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span>Tüm Depolar</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Teknoloji Yığını & Çoklu Dil Dağılımı */}
+        <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-3.5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-[#a89997] pb-3">
+            <div className="flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-[#231c1a]" />
+              <h3 className="text-xs font-bold text-[#231c1a]">Doğrulanmış Teknoloji Yığını</h3>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+              Bayt Tabanlı Analiz
+            </span>
+          </div>
+
+          <div className="space-y-2.5 pt-1">
+            {topLanguages.length === 0 ? (
+              <p className="text-xs text-[#6e5f5c] text-center py-4">Seçili depolarda dil telemetrisi hesaplanıyor...</p>
+            ) : (
+              topLanguages.map((lang, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#231c1a]">
+                    <span>{lang.name}</span>
+                    <span className="text-[#4a3e3b] font-medium">%{lang.percentage} ({lang.sizeKb.toLocaleString()} KB)</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-[#b9aba9]/40 overflow-hidden border border-[#231c1a]/10">
+                    <div
+                      className="h-full bg-[#f9b88e] rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, Math.max(4, lang.percentage))}%` }}
+                    />
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -478,9 +563,13 @@ export const OverviewView: React.FC<Props> = ({
                 {repo.description || 'Aktif GitHub deposu'}
               </p>
               <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#a89997] text-[11px] text-[#6e5f5c]">
-                <span>{repo.open_issues_count} Açık Issue</span>
-                <span className="font-bold text-[#231c1a]">
-                  {repo.forks_count} Fork
+                <span className="flex items-center gap-1 font-medium text-[#4a3e3b]">
+                  <Star className="w-3 h-3 text-[#231c1a]" />
+                  <span>{repo.stargazers_count || 0} Star</span>
+                </span>
+                <span className="flex items-center gap-1 font-bold text-[#231c1a]">
+                  <GitFork className="w-3 h-3 text-[#231c1a]" />
+                  <span>{repo.forks_count || 0} Fork</span>
                 </span>
               </div>
             </div>

@@ -128,7 +128,7 @@ export default function App() {
       case 'overview':
         return 'Mühendislik Zekası Genel Bakış';
       case 'hotspots':
-        return 'Sıcak Noktalar ve Mimari Riskler';
+        return 'Kritik Dosyalar ve Mimari Riskler';
       case 'ask':
         return 'Yapay Zeka Mühendislik Analisti';
       case 'repositories':
@@ -173,6 +173,7 @@ export default function App() {
           onOpenAskAi={() => setActiveTab((prev) => (prev === 'ask' ? 'overview' : 'ask'))}
           isAskAiActive={activeTab === 'ask'}
           rateLimitStatus={rateLimitStatus}
+          isCachedFromDb={Boolean(reposData?.isCachedFromDb || authData?.isCachedFromDb)}
         />
 
         <main className="flex-1 overflow-y-auto px-6 py-6 lg:px-8 lg:py-7">
@@ -271,7 +272,7 @@ export default function App() {
                 <a
                   href="https://yucelgumus.dev/"
                   target="_blank"
-                  rel="author external"
+                  rel="noopener noreferrer author external"
                   title="Yücel Gümüş Kişisel Web Sitesi"
                   className="font-bold text-[#231c1a] hover:underline inline-flex items-center gap-1.5 bg-[#f9b88e] px-2.5 py-1 rounded-lg border border-[#231c1a]/20 shadow-xs transition-all hover:brightness-105"
                 >

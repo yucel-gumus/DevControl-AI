@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { ToolRegistry } from './server/toolRegistry.js';
+import { FirestoreService } from './server/db/firestoreService.js';
 import apiRoutes from './server/routes/api.js';
 
 async function startServer() {
@@ -22,7 +22,8 @@ async function startServer() {
   // JSON request body parser
   app.use(express.json());
 
-  // Araç Kayıt Defterini Başlat
+  // Firestore & Araç Kayıt Defterini Başlat
+  FirestoreService.initialize();
   ToolRegistry.initialize();
 
   // Modüler API Route'ları
@@ -37,6 +38,7 @@ async function startServer() {
   // VITE / STATİK SUNUCU
   // ==========================================
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

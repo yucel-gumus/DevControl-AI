@@ -4,6 +4,7 @@ import { InsightsEngine } from '../ai/insightsEngine.js';
 import { AgentPlanner } from '../ai/agentPlanner.js';
 import { HotspotEngine } from '../metrics/hotspotEngine.js';
 import { GEMINI_MODEL_CHAIN } from '../gemini.js';
+import { FirestoreService } from '../db/firestoreService.js';
 import { asyncHandler } from './asyncHandler.js';
 
 const router = Router();
@@ -22,7 +23,15 @@ router.get('/brief', asyncHandler(async (_req, res) => {
   if (ctx.state.syncStatus === 'error') {
     return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
+
+  // Hızlı Yol: Firestore snapshot'ından gelen önbellek varsa doğrudan dön (Anında Başlatma)
+  const cachedBrief = GitHubService.getCachedDailyBrief();
+  if (cachedBrief && cachedBrief.length > 0 && ctx.state.isCachedFromDb) {
+    return res.json(cachedBrief);
+  }
+
   const brief = await InsightsEngine.generateDailyBrief(ctx.activeRepos, ctx.hotspots, ctx.risks, ctx.health);
+  GitHubService.setCachedDailyBrief(brief);
   res.json(brief);
 }));
 
@@ -67,8 +76,9 @@ router.post('/ask', asyncHandler(async (req, res) => {
       evidence: result.message?.evidence || [],
       recommendedActions: result.message?.recommendedActions || [],
     });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Yapay zeka mühendislik sorgusu işlenirken hata oluştu.' });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'Yapay zeka mühendislik sorgusu işlenirken hata oluştu.';
+    res.status(500).json({ error: errorMsg });
   }
 }));
 
@@ -77,12 +87,26 @@ router.get('/developer-persona', asyncHandler(async (_req, res) => {
   if (state.syncStatus === 'error') {
     return res.status(502).json({ error: state.syncError || 'GitHub verileri eşitlenemedi.' });
   }
+
+  // Hızlı Yol: Firestore snapshot'ından gelen persona varsa doğrudan dön
+  const cachedPersona = GitHubService.getCachedDeveloperPersona();
+  if (cachedPersona && state.isCachedFromDb) {
+    return res.json(cachedPersona);
+  }
+
   const activeRepos = state.repositories.filter((r) => r.selected_for_analysis);
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recentCommits = state.commits.filter((c) => {
+    const t = new Date(c.date).getTime();
+    return Number.isFinite(t) && t >= sevenDaysAgo;
+  });
+  const commitsToAnalyze = recentCommits.length > 0 ? recentCommits : state.commits;
   const persona = await InsightsEngine.generateDeveloperPersona(
     state.user,
     activeRepos.length > 0 ? activeRepos : state.repositories,
-    state.commits
+    commitsToAnalyze
   );
+  GitHubService.setCachedDeveloperPersona(persona);
   res.json(persona);
 }));
 
@@ -91,14 +115,40 @@ router.post('/repo-review', asyncHandler(async (req, res) => {
   if (!repoName || typeof repoName !== 'string') {
     return res.status(400).json({ error: 'repoName alanı zorunludur.' });
   }
+
+  // Önce Firestore'da önbelleğe alınmış hazır inceleme var mı kontrol et
+  const cachedReview = await FirestoreService.getRepoReview(repoName);
+  if (cachedReview && !req.body?.force) {
+    return res.json(cachedReview);
+  }
+
   const state = await GitHubService.ensureSynced();
   const targetRepo = state.repositories.find(r => r.name.toLowerCase() === repoName.toLowerCase());
   if (!targetRepo) {
     return res.status(404).json({ error: `${repoName} deposu bulunamadı.` });
   }
-  const commits = state.commits.filter(c => c.repo_name.toLowerCase() === repoName.toLowerCase());
+
+  let commits = state.commits.filter(c => c.repo_name.toLowerCase() === repoName.toLowerCase());
+  if (commits.length === 0 && !targetRepo.selected_for_analysis) {
+    try {
+      await GitHubService.toggleRepoSelection(targetRepo.id);
+      const updatedState = GitHubService.getState();
+      commits = updatedState.commits.filter(c => c.repo_name.toLowerCase() === repoName.toLowerCase());
+    } catch {
+      // Toggle başarısız olursa mevcut state ile devam et
+    }
+  }
+
   const hotspots = HotspotEngine.analyzeHotspots(commits);
-  const review = await InsightsEngine.reviewRepository(targetRepo, commits, hotspots);
+  const [owner, repoShortName] = (targetRepo.full_name && targetRepo.full_name.includes('/'))
+    ? targetRepo.full_name.split('/')
+    : [state.user.login, targetRepo.name];
+  const fileTree = await GitHubService.fetchRepositoryTree(owner, repoShortName, targetRepo.default_branch);
+  const review = await InsightsEngine.reviewRepository(targetRepo, commits, hotspots, fileTree);
+
+  // Firestore'a kaydet (Upsert)
+  await FirestoreService.saveRepoReview(repoName, review);
+
   res.json(review);
 }));
 
@@ -108,7 +158,21 @@ router.post('/hotspot-refactor', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'filePath ve repoName alanları zorunludur.' });
   }
   const state = await GitHubService.ensureSynced();
-  const commits = state.commits.filter(c => c.repo_name.toLowerCase() === String(repoName).toLowerCase());
+  let commits = state.commits.filter(c => c.repo_name.toLowerCase() === String(repoName).toLowerCase());
+
+  if (commits.length === 0) {
+    const targetRepo = state.repositories.find(r => r.name.toLowerCase() === String(repoName).toLowerCase());
+    if (targetRepo && !targetRepo.selected_for_analysis) {
+      try {
+        await GitHubService.toggleRepoSelection(targetRepo.id);
+        const updatedState = GitHubService.getState();
+        commits = updatedState.commits.filter(c => c.repo_name.toLowerCase() === String(repoName).toLowerCase());
+      } catch {
+        // Toggle başarısız olursa mevcut state ile devam et
+      }
+    }
+  }
+
   const hotspots = HotspotEngine.analyzeHotspots(commits);
   let targetHotspot = hotspots.find(
     (h) => h.path === filePath && h.repo_name.toLowerCase() === String(repoName).toLowerCase()
