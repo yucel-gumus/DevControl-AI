@@ -56,16 +56,17 @@ export class FirestoreService {
     }
 
     try {
-      const projectId = process.env.FIREBASE_PROJECT_ID || 'agenticai-500618';
-      const databaseId =
-        process.env.FIRESTORE_DATABASE_ID ||
-        'ai-studio-evekonomisivebte-5cc5a80b-6894-40e7-b870-cc7588f7630f';
+      const projectId =
+        process.env.FIREBASE_PROJECT_ID ||
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.GCP_PROJECT;
+      const databaseId = process.env.FIRESTORE_DATABASE_ID || '(default)';
 
       const existingApps = getApps();
       if (existingApps.length > 0) {
         this.app = existingApps[0];
       } else {
-        this.app = initializeApp({ projectId });
+        this.app = projectId ? initializeApp({ projectId }) : initializeApp();
       }
 
       // Hedef veritabanını bağla (databaseId veya default)

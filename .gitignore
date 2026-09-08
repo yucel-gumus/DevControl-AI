@@ -3,6 +3,7 @@ node_modules/
 .pnp
 .pnp.js
 .firebase/
+.firebaserc
 
 # Production build
 dist/
