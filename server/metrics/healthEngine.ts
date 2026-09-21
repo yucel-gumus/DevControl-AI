@@ -1,5 +1,5 @@
 import { CommitMetric, PullRequestMetric, IssueMetric, Repository, HealthScoreDimensions, HealthScoreWeights, EngineeringHealthScore } from '../../src/types.js';
-import { SCORING_THRESHOLDS, MS_PER_DAY } from '../constants.js';
+import { SCORING_THRESHOLDS, MS_PER_DAY, STALE_ISSUE_THRESHOLD_DAYS, STALE_PR_THRESHOLD_DAYS } from '../constants.js';
 
 export const DEFAULT_WEIGHTS: HealthScoreWeights = {
   codeHealth: 0.25,
@@ -19,24 +19,11 @@ export class HealthEngine {
     commits: CommitMetric[],
     prs: PullRequestMetric[],
     issues: IssueMetric[],
-    customWeights?: Partial<HealthScoreWeights>,
     telemetryDataStatus?: 'ready' | 'partial'
   ): EngineeringHealthScore {
-    const weights: HealthScoreWeights = {
-      ...DEFAULT_WEIGHTS,
-      ...(customWeights || {}),
-    };
-
-    // Toplam 1 değilse ağırlıkları normalleştir
-    const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
-    const normalizedWeights: HealthScoreWeights = {
-      codeHealth: weights.codeHealth / totalWeight,
-      delivery: weights.delivery / totalWeight,
-      documentation: weights.documentation / totalWeight,
-      maintenance: weights.maintenance / totalWeight,
-      collaboration: weights.collaboration / totalWeight,
-      activity: weights.activity / totalWeight,
-    };
+    // Kopya alınır, sabitin kendisi döndürülmez: `weights` yanıtın parçasıdır
+    // ve bir çağıranın onu değiştirmesi modül sabitini kalıcı olarak bozardı.
+    const weights: HealthScoreWeights = { ...DEFAULT_WEIGHTS };
 
     // Depo metadatası tek başına sağlık skoru üretmeye yetmez. Skor, doğrulanmış
     // GitHub telemetrisi (commit, PR veya issue) geldiğinde hesaplanır.
@@ -58,6 +45,7 @@ export class HealthEngine {
         dataStatus: 'no_data',
         dimensions,
         weights,
+        measuredDimensions: [],
         calculatedAt: new Date().toISOString(),
         breakdownNotes: [
           { dimension: 'codeHealth', score: 0, finding: 'GitHub telemetrisi bağlanana kadar kod sağlığı hesaplanamaz.', status: 'warning' },
@@ -173,16 +161,75 @@ export class HealthEngine {
       activity,
     };
 
-    // Ölçülen boyutları belirle
-    const measuredDimensions: (keyof HealthScoreWeights)[] = [
-      ...(hasCommitData ? ['codeHealth', 'activity', 'delivery', 'maintenance', 'collaboration'] as const : []),
-      ...(hasDocumentationData ? ['documentation'] as const : []),
-    ];
-    const uniqueDimensions = Array.from(new Set(measuredDimensions));
-    const measuredWeightTotal = uniqueDimensions.reduce((total, dimension) => total + normalizedWeights[dimension], 0);
+    /**
+     * Ölçülen boyutlar — TEK kaynak.
+     *
+     * Bir boyut ancak değeri gerçekten hesaplandıysa "ölçülmüş" sayılır ve
+     * koşullar yukarıdaki atama bloklarının AYNISIDIR (kod sağlığı ve aktivite
+     * commit'e, teslimat PR'a ya da commit ritmine, bakım issue'a ya da
+     * commit'e, işbirliği commit/PR'a, dokümantasyon commit ya da issue'a
+     * bağlıdır). Farklı bir koşul yazmak — ör. bakımı yalnızca commit verisine
+     * bağlamak — issue-only bir kapsamda ÖLÇÜLMÜŞ bir bakım skorunu (ör. 43,
+     * 'critical') ağırlıklı ortalamadan düşürür: genel skor yalnızca kalan
+     * boyutlardan hesaplanırken aynı yanıtın `breakdownNotes` alanı ölçülen
+     * bakım değerini bildirir ve iki alan birbiriyle çelişir. Aynı küme üç
+     * tüketiciye hizmet eder: ağırlıklı ortalama, notların "ölçüldü/ölçülemedi"
+     * metni ve yanıttaki `measuredDimensions` (arayüz ölçülmemiş bir boyutu
+     * "0/100" diye göstermesin diye — bkz. src/types.ts).
+     */
+    const dimensionMeasured: Record<keyof HealthScoreWeights, boolean> = {
+      codeHealth: hasCommitData,
+      delivery: hasCommitData || hasPRData,
+      documentation: hasDocumentationData,
+      maintenance: hasCommitData || hasIssueData,
+      collaboration: hasCommitData || hasPRData,
+      activity: hasCommitData,
+    };
+    const uniqueDimensions = (Object.keys(dimensionMeasured) as (keyof HealthScoreWeights)[])
+      .filter((dimension) => dimensionMeasured[dimension]);
+
+    // Tek bir boyut bile ölçülmediyse ağırlıklı ortalama tanımsızdır. Böleni
+    // 1'e düşürüp 0 skor döndürmek (eski `|| 1`), hiç ölçüm yapılmamış bir
+    // sağlığı "ölçülmüş sıfır" ve 'F' notuyla gösterirdi; bu yüzden ölçümsüz
+    // durum, erken dönüşteki aynı sözleşmeyle (hasData: false, grade: NO_DATA)
+    // bildirilir.
+    if (uniqueDimensions.length === 0) {
+      const dimensions: HealthScoreDimensions = {
+        codeHealth: 0,
+        delivery: 0,
+        documentation: 0,
+        maintenance: 0,
+        collaboration: 0,
+        activity: 0,
+      };
+      return {
+        overallScore: 0,
+        grade: 'NO_DATA',
+        hasData: false,
+        dataStatus: 'no_data',
+        dimensions,
+        weights,
+        measuredDimensions: [],
+        calculatedAt: new Date().toISOString(),
+        breakdownNotes: [
+          { dimension: 'codeHealth', score: 0, finding: 'Sağlık skoru için ölçülebilir bir boyut bulunmuyor.', status: 'warning' },
+          { dimension: 'delivery', score: 0, finding: 'Sağlık skoru için ölçülebilir bir boyut bulunmuyor.', status: 'warning' },
+          { dimension: 'documentation', score: 0, finding: 'Sağlık skoru için ölçülebilir bir boyut bulunmuyor.', status: 'warning' },
+          { dimension: 'maintenance', score: 0, finding: 'Sağlık skoru için ölçülebilir bir boyut bulunmuyor.', status: 'warning' },
+          { dimension: 'collaboration', score: 0, finding: 'Sağlık skoru için ölçülebilir bir boyut bulunmuyor.', status: 'warning' },
+          { dimension: 'activity', score: 0, finding: 'Sağlık skoru için ölçülebilir bir boyut bulunmuyor.', status: 'warning' },
+        ],
+      };
+    }
+
+    // Bölen sıfır olamaz: `DEFAULT_WEIGHTS`in her bileşeni pozitiftir ve
+    // yukarıdaki erken dönüş en az bir ölçülmüş boyut garanti eder. (Ağırlıklar
+    // toplamı 1'dir; payda YALNIZCA ölçülmüş boyutları toplar, böylece
+    // ölçülmemiş bir boyut skoru seyreltmez.)
+    const measuredWeightTotal = uniqueDimensions.reduce((total, dimension) => total + weights[dimension], 0);
     const overallScore = Math.round(
-      uniqueDimensions.reduce((total, dimension) => total + dimensions[dimension] * normalizedWeights[dimension], 0)
-      / (measuredWeightTotal || 1)
+      uniqueDimensions.reduce((total, dimension) => total + dimensions[dimension] * weights[dimension], 0)
+      / measuredWeightTotal
     );
 
     let grade: 'A' | 'B' | 'C' | 'D' | 'F' = 'B';
@@ -207,10 +254,18 @@ export class HealthEngine {
       {
         dimension: 'delivery',
         score: dimensions.delivery,
+        // Eşik metne gömülmez: `is_stale` bayrağı bu sabitle işaretlenir (bkz.
+        // githubService). Ayrı yazılan bir sayı sabitle ayrıştığında, bulgu
+        // cümlesi kendi hesabını yanlış anlatırdı.
         finding: hasPRData
-          ? `${mergedPRs} birleştirilmiş PR, 7 günden uzun süredir bekleyen ${stalePRs} durgun PR. Ortalama ölçülmüş PR çevrim süresi: ${avgCycleHours.toFixed(1)} saat.`
-          : 'PR kaydı bulunmadığı için teslimat boyutu ölçülemedi.',
-        status: hasPRData
+          ? `${mergedPRs} birleştirilmiş PR, ${STALE_PR_THRESHOLD_DAYS} günden uzun süredir bekleyen ${stalePRs} durgun PR. Ortalama ölçülmüş PR çevrim süresi: ${avgCycleHours.toFixed(1)} saat.`
+          // PR yokluğu ölçümsüzlük DEĞİLDİR: kişisel kapsamda boyut doğrudan
+          // commit ritminden hesaplanır (bkz. yukarıdaki teslimat dalı), yani
+          // "ölçülemedi" demek raporlanan skoru yalanlardı.
+          : hasCommitData
+            ? 'PR kaydı bulunmadığı için teslimat boyutu kişisel commit ritmi (son 14 gün) üzerinden ölçüldü.'
+            : 'Ne PR ne commit kaydı bulunduğu için teslimat boyutu ölçülemedi.',
+        status: dimensionMeasured.delivery
           ? dimensions.delivery >= 80 ? 'good' : dimensions.delivery >= 65 ? 'warning' : 'critical'
           : 'warning',
       },
@@ -227,10 +282,17 @@ export class HealthEngine {
       {
         dimension: 'maintenance',
         score: dimensions.maintenance,
+        // Eşik metne gömülmez (bkz. teslimat boyutu): `is_stale` bu sabitle
+        // işaretlenir (bkz. githubService).
         finding: hasIssueData
-          ? `İzlenen ${repositories.length} depo genelinde 14 günden eski ${staleIssues} çözülmemiş sorun tespit edildi.`
-          : 'Issue kaydı bulunmadığı için bakım boyutu ölçülemedi.',
-        status: hasIssueData
+          ? `İzlenen ${repositories.length} depo genelinde ${STALE_ISSUE_THRESHOLD_DAYS} günden eski ${staleIssues} çözülmemiş sorun tespit edildi.`
+          // Issue yokluğu ölçümsüzlük DEĞİLDİR: commit verisi olan kapsamda
+          // bakım, "açık issue yok" varsayımıyla ölçülür (bkz. yukarıdaki
+          // bakım dalı); "ölçülemedi" demek raporlanan skoru yalanlardı.
+          : hasCommitData
+            ? 'Issue kaydı bulunmadığı için bakım boyutu commit geçmişi üzerinden ölçüldü (açık sorun bulunmuyor).'
+            : 'Issue kaydı bulunmadığı için bakım boyutu ölçülemedi.',
+        status: dimensionMeasured.maintenance
           ? dimensions.maintenance >= 80 ? 'good' : dimensions.maintenance >= 65 ? 'warning' : 'critical'
           : 'warning',
       },
@@ -263,6 +325,7 @@ export class HealthEngine {
       dataStatus,
       dimensions,
       weights,
+      measuredDimensions: uniqueDimensions,
       calculatedAt: new Date().toISOString(),
       breakdownNotes,
     };

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { GitHubService } from '../github/githubService.js';
+import { deriveRepositoryRiskLevel, groupHotspotsByRepo } from '../../src/constants.js';
 import { asyncHandler } from './asyncHandler.js';
+import { respondIfSyncFailed, SYNC_FAILED_MESSAGE } from './syncGuard.js';
 
 const authRouter = Router();
 const reposRouter = Router();
@@ -38,26 +40,21 @@ authRouter.post('/token', (_req, res) => {
 // ------------------------------------------
 reposRouter.get('/', asyncHandler(async (_req, res) => {
   const ctx = await GitHubService.getActiveTelemetryContext();
-  if (ctx.state.syncStatus === 'error') {
-    return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
-  }
+  if (respondIfSyncFailed(res, ctx.state)) return;
   const { state, hotspots } = ctx;
 
-  const enrichedRepos = state.repositories.map((repo) => {
-    const repoHotspots = hotspots.filter((h) => h.repo_name === repo.name);
-    const hasCriticalHotspot = repoHotspots.some((h) => h.risk_level === 'CRITICAL');
-    const hasHighHotspot = repoHotspots.some((h) => h.risk_level === 'HIGH');
+  // Sıcak noktalar depoya göre BİR kez gruplanır (tek geçiş): her depo için tüm
+  // listeyi yeniden taramak O(depo × sıcak nokta) maliyeti üretirdi. Gruplama
+  // da tek kaynaktadır; ajan projeksiyonu aynı fonksiyonu çağırır.
+  const hotspotsByRepo = groupHotspotsByRepo(hotspots);
 
-    let riskLevel: 'HEALTHY' | 'NEEDS_ATTENTION' | 'AT_RISK' | 'CRITICAL' = 'HEALTHY';
-    if (hasCriticalHotspot) riskLevel = 'CRITICAL';
-    else if (hasHighHotspot) riskLevel = 'AT_RISK';
-    else if (repoHotspots.length > 0) riskLevel = 'NEEDS_ATTENTION';
-
-    return {
-      ...repo,
-      risk_level: riskLevel,
-    };
-  });
+  const enrichedRepos = state.repositories.map((repo) => ({
+    ...repo,
+    // Eşikleme kuralı tek kaynakta (bkz. deriveRepositoryRiskLevel): ajan
+    // projeksiyonu ve olgu satırı da aynı fonksiyonu çağırır, böylece aynı
+    // telemetri iki yüzeyde iki farklı seviye gösteremez.
+    risk_level: deriveRepositoryRiskLevel(hotspotsByRepo.get(repo.name) || []),
+  }));
 
   res.json({
     repositories: enrichedRepos,
@@ -66,15 +63,8 @@ reposRouter.get('/', asyncHandler(async (_req, res) => {
     syncError: state.syncError,
     telemetryStatus: state.telemetryStatus,
     rateLimitStatus: GitHubService.getRateLimitStatus(),
-    punchCard: ctx.punchCard || [],
-    languagesBreakdown: ctx.languagesBreakdown || [],
     isCachedFromDb: Boolean(state.isCachedFromDb),
   });
-}));
-
-reposRouter.get('/punch-card', asyncHandler(async (_req, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext();
-  res.json({ punchCard: ctx.punchCard || [] });
 }));
 
 reposRouter.post('/toggle', asyncHandler(async (req, res) => {
@@ -103,7 +93,9 @@ reposRouter.post('/sync', asyncHandler(async (_req, res) => {
       isCachedFromDb: false,
     });
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'GitHub verileri eşitlenemedi.';
+    // Yedek metin tek kaynaktan (bkz. syncGuard): burada ayrı yazılan bir kopya,
+    // aynı hatayı iki uçta iki farklı cümleyle anlatırdı.
+    const errorMsg = err instanceof Error ? err.message : SYNC_FAILED_MESSAGE;
     res.status(502).json({ error: errorMsg });
   }
 }));

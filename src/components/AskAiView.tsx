@@ -9,11 +9,13 @@ import {
   CheckCircle2,
   Copy,
   Check,
+  AlertCircle,
   RotateCcw,
   ShieldCheck,
 } from 'lucide-react';
-import { AskAiMessage, AnalysisTrace } from '../types.js';
+import { AskAiMessage, AnalysisTrace, AnalysisTraceStep } from '../types.js';
 import { formatTime } from '../utils/formatters.js';
+import { ACTIVITY_WINDOW_DAYS } from '../../server/constants.js';
 
 interface Props {
   messages: AskAiMessage[];
@@ -33,9 +35,33 @@ export const AskAiView: React.FC<Props> = ({
   defaultPrompt,
 }) => {
   const [input, setInput] = useState('');
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  /**
+   * Kopyalama geri bildirimi ÜÇ durumludur: onay (`ok: true`), başarısızlık
+   * (`ok: false`) ve gösterilecek bir şey yok. Tek bir "kopyalandı mı" bayrağı
+   * panoya yazılamadığında da onay gösterirdi: `navigator.clipboard` güvenli
+   * olmayan kaynakta hiç bulunmaz, izin reddedilebilir ya da belge odaklı
+   * değildir (writeText reddeder). Kullanıcı "Kopyalandı" görüp yapıştırdığında
+   * eski içeriği bulurdu — yapılmayan bir işlemi yapılmış gibi göstermemek,
+   * ölçüm dürüstlüğü kuralının arabirimdeki karşılığıdır.
+   */
+  const [copyFeedback, setCopyFeedback] = useState<{ id: string; ok: boolean } | null>(null);
+  /**
+   * Geri bildirimi silen zamanlayıcı; yeni bir kopyalamada ve bileşen
+   * sökülürken temizlenir. Temizlenmezse iki sorun doğar: (1) 2 sn'lik eski bir
+   * zamanlayıcı, araya giren YENİ bir kopyalamanın onayını erkenden siler
+   * (kullanıcı onayı göremez), (2) sohbet temizlendiğinde görünüm `key` ile
+   * yeniden bağlandığı için zamanlayıcı sökülmüş bir bileşende durum güncelleme
+   * çağrısı yapar.
+   */
+  const copyFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => () => {
+    if (copyFeedbackTimerRef.current !== null) {
+      clearTimeout(copyFeedbackTimerRef.current);
+    }
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -46,10 +72,16 @@ export const AskAiView: React.FC<Props> = ({
   }, [messages, isLoading]);
 
   useEffect(() => {
-    if (defaultPrompt) {
-      setInput(defaultPrompt);
-      inputRef.current?.focus();
-    }
+    // Boş değer de bir sinyaldir: `clearChat` istemi boşaltır ve görünümü
+    // yeniden bağlar (App.tsx -> `key`), bu yüzden giriş kutusu temizlenmiş
+    // sohbette eski metni göstermeye devam etmemelidir.
+    setInput(defaultPrompt || '');
+    // Odak her iki durumda da girişe verilir: yeniden bağlanma, odaklanmış
+    // "Sohbeti Temizle" düğmesini yok eder ve odağı belgeye düşürür; geri
+    // vermezsek klavye kullanıcısı bir sonraki Tab'da sayfanın başından
+    // dolaşmaya başlar. Ön-doldurma da aynı yol üzerinden odaklanır, bu yüzden
+    // ayrı bir bağlanma etkisi gerekmez (ilk bağlanmada istem zaten boştur).
+    inputRef.current?.focus();
   }, [defaultPrompt]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -59,17 +91,39 @@ export const AskAiView: React.FC<Props> = ({
     setInput('');
   };
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopy = async (text: string, id: string) => {
+    // `navigator.clipboard` yokluğu da (güvenli olmayan kaynak) bu denemenin
+    // içinde yakalanır: `.writeText` çağrısı TypeError fırlatır ve başarısızlık
+    // olarak raporlanır.
+    let ok = true;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      ok = false;
+    }
+    setCopyFeedback({ id, ok });
+    if (copyFeedbackTimerRef.current !== null) {
+      clearTimeout(copyFeedbackTimerRef.current);
+    }
+    copyFeedbackTimerRef.current = setTimeout(() => {
+      copyFeedbackTimerRef.current = null;
+      setCopyFeedback(null);
+    }, 2000);
   };
 
   const defaultPrompts = [
     'En yüksek hata oranına sahip 3 kritik dosyamı ve nedenlerini analiz et.',
-    'Son 7 günlük commit tempomu ve kod oynaklığı trendlerimi açıkla.',
+    // Pencereyi elle yazmak, sistemin ölçtüğü haftalık pencere (bkz.
+    // ACTIVITY_WINDOW_DAYS) değiştiğinde öneriyi sessizce ayrıştırırdı.
+    `Son ${ACTIVITY_WINDOW_DAYS} günlük commit tempomu ve kod oynaklığı trendlerimi açıkla.`,
     'En çok kod dalgalanması olan depom için 3 somut mimari iyileştirme öner.',
   ];
+
+  /**
+   * Kullanıcı henüz bir soru sormadı mı? Sohbet her zaman karşılama mesajıyla
+   * başladığı için "mesaj listesi boş" ölçütü hiçbir zaman doğru olmaz.
+   */
+  const hasUserTurn = messages.some((msg) => msg.role === 'user');
 
   return (
     <div id="ask-ai-view" className="flex flex-col h-[calc(100vh-8.5rem)] font-sans text-[#231c1a]">
@@ -82,7 +136,7 @@ export const AskAiView: React.FC<Props> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xs font-bold text-[#231c1a] tracking-tight">
-                DevControl KENSAI
+                DevControl AI
               </h2>
               <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
                 KENSAI
@@ -97,8 +151,9 @@ export const AskAiView: React.FC<Props> = ({
         {onClearChat && messages.length > 0 && (
           <button
             onClick={onClearChat}
+            disabled={isLoading}
             aria-label="Sohbet geçmişini temizle"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer shadow-xs"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <RotateCcw className="w-3 h-3" aria-hidden="true" />
             <span>Sohbeti Temizle</span>
@@ -108,38 +163,7 @@ export const AskAiView: React.FC<Props> = ({
 
       {/* Mesaj Akışı Alanı */}
       <div className="flex-1 overflow-y-auto p-4 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-4 shadow-xs">
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#f9b88e] border border-[#231c1a]/15 flex items-center justify-center text-[#231c1a] shadow-xs">
-              <Terminal className="w-6 h-6" />
-            </div>
-            <div className="max-w-md space-y-1">
-              <h3 className="text-sm font-bold text-[#231c1a]">
-                Kod Tabanınız Hakkında Soru Sorun
-              </h3>
-              <p className="text-xs text-[#4a3e3b] font-medium">
-                Ajan; depolarınızı, kritik dosyaları, hata oranlarını ve PR durumlarını analiz ederek somut yanıtlar üretir.
-              </p>
-            </div>
-
-            {/* Hızlı Başlangıç İpuçları */}
-            <div className="w-full max-w-lg space-y-2 pt-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a3e3b] block text-left">
-                Örnek Mühendislik Soruları
-              </span>
-              {defaultPrompts.map((prompt, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => onSendMessage(prompt)}
-                  className="w-full text-left p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 hover:bg-[#b9aba9]/50 transition-all text-xs font-bold text-[#231c1a] cursor-pointer shadow-xs"
-                >
-                  "{prompt}"
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          messages.map((msg) => {
+        {messages.map((msg) => {
             const isUser = msg.role === 'user';
             return (
               <div
@@ -169,12 +193,28 @@ export const AskAiView: React.FC<Props> = ({
                       </span>
                       {!isUser && (
                         <button
+                          type="button"
                           onClick={() => handleCopy(msg.content, msg.id)}
-                          className="text-[#4a3e3b] hover:text-[#231c1a] transition-colors p-0.5"
-                          title="Yanıtı kopyala"
+                          className="text-[#4a3e3b] hover:text-[#231c1a] transition-colors p-0.5 cursor-pointer"
+                          title={
+                            copyFeedback?.id === msg.id && !copyFeedback.ok
+                              ? 'Panoya kopyalanamadı'
+                              : 'Yanıtı kopyala'
+                          }
+                          aria-label={
+                            copyFeedback?.id === msg.id
+                              ? copyFeedback.ok
+                                ? 'Yanıt kopyalandı'
+                                : 'Panoya kopyalanamadı'
+                              : 'Yanıtı kopyala'
+                          }
                         >
-                          {copiedId === msg.id ? (
-                            <Check className="w-3 h-3 text-[#231c1a]" />
+                          {copyFeedback?.id === msg.id ? (
+                            copyFeedback.ok ? (
+                              <Check className="w-3 h-3 text-[#231c1a]" />
+                            ) : (
+                              <AlertCircle className="w-3 h-3 text-[#231c1a]" />
+                            )
                           ) : (
                             <Copy className="w-3 h-3" />
                           )}
@@ -260,8 +300,18 @@ export const AskAiView: React.FC<Props> = ({
 
                   {/* Arka Planda Çalıştırılan Araçlar (Tool Invocations) */}
                   {!isUser && (() => {
-                    const tools = msg.toolInvocations?.map((t) => t.toolName) || msg.trace?.toolsUsed || [];
+                    const tools = msg.trace?.toolsUsed || [];
                     if (tools.length === 0) return null;
+                    // Araç adı çağrıdan ÖNCE listeye girer (bkz. agentPlanner),
+                    // yani başarısız bir çağrı da burada görünür. Her satıra onay
+                    // işareti ve "Tamamlandı" yazmak, hiç veri getirmemiş bir
+                    // aracı başarılı göstermek olurdu; durum iz adımlarından
+                    // (`tool` alanı) okunur ve eşleşme bulunamazsa yalnızca
+                    // doğrulanabilir olan söylenir: araç sorgulandı.
+                    const toolStatuses = new Map<string, AnalysisTraceStep['status']>();
+                    for (const step of msg.trace?.steps || []) {
+                      if (step.tool) toolStatuses.set(step.tool, step.status);
+                    }
                     return (
                       <div className="pt-2 border-t border-[#a89997] space-y-1.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a3e3b] flex items-center gap-1">
@@ -269,22 +319,32 @@ export const AskAiView: React.FC<Props> = ({
                           <span>Sorgulanan GitHub Telemetri Araçları</span>
                         </span>
                         <div className="space-y-1">
-                          {tools.map((toolName, tIdx) => (
-                            <div
-                              key={tIdx}
-                              className="p-2 rounded bg-[#cdc1b5] border border-[#a89997] text-[11px] flex items-center justify-between gap-2"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <CheckCircle2 className="w-3 h-3 text-[#231c1a]" />
-                                <span className="font-mono font-bold text-[#231c1a]">
-                                  {toolName}
+                          {tools.map((toolName, tIdx) => {
+                            const status = toolStatuses.get(toolName);
+                            const failed = status === 'failed';
+                            return (
+                              <div
+                                key={tIdx}
+                                className="p-2 rounded bg-[#cdc1b5] border border-[#a89997] text-[11px] flex items-center justify-between gap-2"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  {failed ? (
+                                    <AlertCircle className="w-3 h-3 text-[#f9b88e]" aria-hidden="true" />
+                                  ) : status === 'completed' ? (
+                                    <CheckCircle2 className="w-3 h-3 text-[#231c1a]" aria-hidden="true" />
+                                  ) : (
+                                    <span className="w-3 h-3 rounded-full border border-[#4a3e3b]" aria-hidden="true" />
+                                  )}
+                                  <span className="font-mono font-bold text-[#231c1a]">
+                                    {toolName}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-[#4a3e3b] font-bold">
+                                  {failed ? 'Başarısız' : status === 'completed' ? 'Tamamlandı' : 'Sorgulandı'}
                                 </span>
                               </div>
-                              <span className="text-[10px] text-[#4a3e3b] font-bold">
-                                Tamamlandı
-                              </span>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -299,6 +359,49 @@ export const AskAiView: React.FC<Props> = ({
               </div>
             );
           })
+        }
+
+        {/*
+          Hızlı Başlangıç İpuçları.
+          Koşul artık "hiç mesaj yok" değil, "kullanıcı sırası başlamadı": sohbet
+          her zaman karşılama mesajıyla açıldığı için eski koşul hiçbir zaman
+          doğru olmuyordu ve örnek sorular — yazılmış olmalarına rağmen —
+          kullanıcıya HİÇ gösterilmiyordu. Karşılamadan sonra, ilk soru
+          sorulmadan önce gösterilir; "Sohbeti Temizle" ile geri gelir.
+        */}
+        {!hasUserTurn && (
+          <div className="flex flex-col items-center justify-center text-center p-6 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#f9b88e] border border-[#231c1a]/15 flex items-center justify-center text-[#231c1a] shadow-xs">
+              <Terminal className="w-6 h-6" />
+            </div>
+            <div className="max-w-md space-y-1">
+              <h3 className="text-sm font-bold text-[#231c1a]">
+                Kod Tabanınız Hakkında Soru Sorun
+              </h3>
+              <p className="text-xs text-[#4a3e3b] font-medium">
+                Ajan; depolarınızı, kritik dosyaları, hata oranlarını ve PR durumlarını analiz ederek somut yanıtlar üretir.
+              </p>
+            </div>
+
+            <div className="w-full max-w-lg space-y-2 pt-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a3e3b] block text-left">
+                Örnek Mühendislik Soruları
+              </span>
+              {defaultPrompts.map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onSendMessage(prompt)}
+                  // Uçuşta bir yanıt varken ikinci kez tetiklemek sunucuda
+                  // ikinci bir yapay zeka üretimi (faturalanan çağrı)
+                  // başlatırdı; giriş çubuğuyla aynı kapı uygulanır.
+                  disabled={isLoading}
+                  className="w-full text-left p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 hover:bg-[#b9aba9]/50 transition-all text-xs font-bold text-[#231c1a] cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  "{prompt}"
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Yükleniyor Göstergesi */}
@@ -330,12 +433,33 @@ export const AskAiView: React.FC<Props> = ({
             </div>
             <div className="space-y-1">
               {activeTrace.steps.map((step, idx) => (
-                <div key={idx} className="flex items-center justify-between text-[11px] text-[#4a3e3b]">
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3 h-3 text-[#231c1a]" />
-                    <span>{step.step}</span>
+                <div key={idx} className="flex items-start justify-between gap-2 text-[11px] text-[#4a3e3b]">
+                  <span className="flex items-start gap-1 min-w-0">
+                    {/* Simge ADIMIN DURUMUNU bildirir: her adıma onay işareti
+                        koymak, başarısız bir araç çağrısını başarılı gibi
+                        gösterirdi (bkz. AnalysisTraceStep.status). Hata ayrıntısı
+                        da gösterilir: `details` alanı başarısız adımda tam olarak
+                        hatanın kendisini taşır ve gizlenirse kullanıcı izde
+                        yalnızca "başarısız oldu" cümlesini görür. */}
+                    {step.status === 'failed' ? (
+                      <AlertCircle className="w-3 h-3 text-[#f9b88e] shrink-0 mt-0.5" aria-hidden="true" />
+                    ) : step.status === 'completed' ? (
+                      <Check className="w-3 h-3 text-[#231c1a] shrink-0 mt-0.5" aria-hidden="true" />
+                    ) : (
+                      <span className="w-3 h-3 rounded-full border border-[#4a3e3b] shrink-0 mt-0.5" aria-hidden="true" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block">{step.step}</span>
+                      {step.details && (
+                        <span className="block text-[10px] text-[#4a3e3b]/80 break-words">{step.details}</span>
+                      )}
+                    </span>
                   </span>
-                  <span className="font-mono text-[10px]">{step.durationMs}ms</span>
+                  {/* Süre ölçülmemiş olabilir: `${step.durationMs}ms` yazmak
+                      "undefinedms" basardı. */}
+                  {typeof step.durationMs === 'number' && (
+                    <span className="font-mono text-[10px] shrink-0">{step.durationMs}ms</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -346,9 +470,15 @@ export const AskAiView: React.FC<Props> = ({
       </div>
 
       {/* Mesaj Yazma Giriş Çubuğu */}
+      {/* Odak göstergesi giriş kutusunun KENDİSİNDE değil, çerçevede verilir
+          (`focus-within`): metin alanı çerçevenin içinde durduğu için odak
+          halkası yerine kenarlık rengi değişir. `focus:outline-none` tek başına
+          bırakılsaydı klavye kullanıcısı Tab ile buraya geldiğinde ekranda
+          hiçbir değişiklik görmez, odağın nerede olduğunu anlayamazdı
+          (WCAG 2.4.7; aynı desen RepositoriesView arama kutusunda da var). */}
       <form
         onSubmit={handleSubmit}
-        className="mt-3 flex items-center gap-2 p-1.5 rounded-xl border border-[#a89997] bg-[#cdc1b5] shadow-xs shrink-0"
+        className="mt-3 flex items-center gap-2 p-1.5 rounded-xl border border-[#a89997] bg-[#cdc1b5] shadow-xs shrink-0 transition-colors focus-within:border-[#231c1a]"
       >
         <input
           ref={inputRef}
@@ -357,7 +487,8 @@ export const AskAiView: React.FC<Props> = ({
           onChange={(e) => setInput(e.target.value)}
           placeholder="Mühendislik veya depo analizi hakkında soru sorun..."
           disabled={isLoading}
-          className="flex-1 bg-transparent px-3 py-2 text-xs text-[#231c1a] placeholder-[#6e5f5c] focus:outline-none disabled:opacity-50 font-medium"
+          aria-label="Soru yazma alanı"
+          className="flex-1 bg-transparent px-3 py-2 text-xs text-[#231c1a] placeholder-[#4a3e3b] focus:outline-none disabled:opacity-50 font-medium"
         />
         <button
           type="submit"

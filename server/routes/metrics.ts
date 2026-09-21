@@ -2,30 +2,25 @@ import { Router } from 'express';
 import { GitHubService } from '../github/githubService.js';
 import { TELEMETRY_WINDOW_DAYS } from '../constants.js';
 import { asyncHandler } from './asyncHandler.js';
+import { respondIfSyncFailed } from './syncGuard.js';
 
 const router = Router();
 
 router.get('/health', asyncHandler(async (_req, res) => {
   const ctx = await GitHubService.getActiveTelemetryContext();
-  if (ctx.state.syncStatus === 'error') {
-    return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
-  }
+  if (respondIfSyncFailed(res, ctx.state)) return;
   res.json({ ...ctx.health, syncStatus: ctx.state.syncStatus, telemetryStatus: ctx.state.telemetryStatus });
 }));
 
 router.get('/hotspots', asyncHandler(async (_req, res) => {
   const ctx = await GitHubService.getActiveTelemetryContext();
-  if (ctx.state.syncStatus === 'error') {
-    return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
-  }
+  if (respondIfSyncFailed(res, ctx.state)) return;
   res.json(ctx.hotspots);
 }));
 
 router.get('/risks', asyncHandler(async (_req, res) => {
   const ctx = await GitHubService.getActiveTelemetryContext();
-  if (ctx.state.syncStatus === 'error') {
-    return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
-  }
+  if (respondIfSyncFailed(res, ctx.state)) return;
   res.json(ctx.risks);
 }));
 
@@ -36,11 +31,9 @@ router.get('/activity', asyncHandler(async (req, res) => {
     : TELEMETRY_WINDOW_DAYS;
 
   const ctx = await GitHubService.getActiveTelemetryContext();
-  if (ctx.state.syncStatus === 'error') {
-    return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
-  }
+  if (respondIfSyncFailed(res, ctx.state)) return;
 
-  const { commits, pullRequests } = ctx;
+  const { commits } = ctx;
   const dayKey = (value: string | undefined): string | null => {
     if (!value) return null;
     const date = new Date(value);
@@ -59,7 +52,6 @@ router.get('/activity', asyncHandler(async (req, res) => {
       date: date.toISOString().slice(0, 10),
       commits: 0,
       bugFixes: 0,
-      prsMerged: 0,
     };
   });
   const byDate = new Map(timeSeries.map((entry) => [entry.date, entry]));
@@ -71,25 +63,7 @@ router.get('/activity', asyncHandler(async (req, res) => {
     if (commit.is_bug_fix) entry.bugFixes += 1;
   });
 
-  pullRequests
-    .filter((pr) => Boolean(pr.merged_at))
-    .forEach((pr) => {
-      const entry = byDate.get(dayKey(pr.merged_at) || '');
-      if (entry) entry.prsMerged += 1;
-    });
-
-  res.json({
-    timeSeries,
-    windowDays: days,
-    totals: timeSeries.reduce(
-      (totals, entry) => ({
-        commits: totals.commits + entry.commits,
-        bugFixes: totals.bugFixes + entry.bugFixes,
-        prsMerged: totals.prsMerged + entry.prsMerged,
-      }),
-      { commits: 0, bugFixes: 0, prsMerged: 0 }
-    ),
-  });
+  res.json({ timeSeries });
 }));
 
 export default router;

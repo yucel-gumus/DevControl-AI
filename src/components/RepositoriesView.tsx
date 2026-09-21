@@ -16,13 +16,33 @@ import {
   Tag,
 } from 'lucide-react';
 import { Repository, GitHubUser, RepoAiReview } from '../types.js';
-import { useRepoReview } from '../hooks/useMetrics.js';
+import { formatDate, formatMeasuredCount } from '../utils/formatters.js';
+import { useRepoReview, REPO_REVIEW_MUTATION_KEY } from '../hooks/useMetrics.js';
+import { useModalA11y } from '../hooks/useModalA11y.js';
+import { useIsMutating } from '@tanstack/react-query';
 
 interface Props {
   repositories: Repository[];
   user: GitHubUser | null;
   onToggleRepo: (repoId: string) => void;
   onAskAboutRepo: (repoName: string) => void;
+  /**
+   * Seçimi değiştirilmekte olan deponun kimliği (istek sürerken). Yalnızca o
+   * deponun düğmesi kapatılır: istek tamamlanana kadar aynı depoya ikinci kez
+   * basmak, sunucuda sıraya girmiş iki seçim değişikliği (ve iki eşitleme
+   * turu) üretirdi.
+   */
+  pendingRepoId?: string | null;
+  /** Depo listesi isteği başarısızsa hata metni; "depo yok" sonucundan ayrılır. */
+  reposError?: string | null;
+  /**
+   * Depo listesi ilk kez yükleniyor mu? Yüklenirken sayaçlar "0" yerine "--"
+   * gösterir: yazılan bir sıfır ölçülmüş sonuç gibi okunurdu ("depo yok").
+   * Bayrak Depo listesi isteğine ÖZELDİR: başka bir telemetri sorgusu hâlâ
+   * uçuşta diye ölçülmüş bir sayı "--" gösterilemez (bkz. App.tsx ->
+   * queryUnmeasured).
+   */
+  telemetryLoading?: boolean;
 }
 
 export const RepositoriesView: React.FC<Props> = ({
@@ -30,45 +50,132 @@ export const RepositoriesView: React.FC<Props> = ({
   user,
   onToggleRepo,
   onAskAboutRepo,
+  pendingRepoId = null,
+  reposError = null,
+  telemetryLoading = false,
 }) => {
   const [search, setSearch] = useState('');
   const [filterLang, setFilterLang] = useState<string>('ALL');
 
   // KENSAI İnceleme Modalı Durumu
   const [activeRepoForReview, setActiveRepoForReview] = useState<Repository | null>(null);
-  const activeRepoNameRef = useRef<string | null>(null);
+  /**
+   * İnceleme isteğinin sıra numarası. Depo adına bakan bir koruma yetmez: aynı
+   * depo için ikinci bir istek başlatıldığında (modalı kapatıp yeniden açmak
+   * dahil) geç gelen eski yanıt da adı eşleştirip taze sonucun üzerine yazardı.
+   * Yalnızca **en son** isteğin yanıtı ekrana yazılır.
+   */
+  const reviewRequestRef = useRef(0);
   const [reviewResult, setReviewResult] = useState<RepoAiReview | null>(null);
   const repoReviewMutation = useRepoReview();
 
-  const handleTriggerReview = async (repo: Repository) => {
+  /**
+   * Son inceleme isteğinin `force` niyeti. Hata sonrası "Tekrar Dene"
+   * düğmesi AYNI isteği yinelemelidir: force'suz bir deneme sunucuda 7
+   * günlük önbelleğe düşer (bkz. server/routes/ai.ts -> /repo-review) ve
+   * kullanıcı "Yeniden Üret" istemişken bayat raporu taze sanır — üstelik
+   * rapor anında döndüğü için hata da görünmez.
+   */
+  const lastReviewForceRef = useRef(false);
+
+  /**
+   * Uçuştaki inceleme KÜRESEL olarak okunur (bu bileşenin kancasından değil):
+   * inceleme sürerken sekme değiştirilirse bileşen sökülür, yerel `isPending`
+   * sıfırlanır ve dönüldüğünde aynı depo için ikinci bir faturalanan yapay zeka
+   * üretimi başlatılabilirdi. `mutationKey` sayesinde uçuştaki istek sorgu
+   * istemcisinde görünür kalır (bkz. useMetrics).
+   */
+  const isReviewInFlight = useIsMutating({ mutationKey: REPO_REVIEW_MUTATION_KEY }) > 0;
+
+  /**
+   * Depo incelemesini başlatır.
+   *
+   * `force` sunucunun 7 günlük inceleme önbelleğini atlar ve raporu güncel
+   * telemetriden yeniden üretir (bkz. server/routes/ai.ts -> /repo-review):
+   * mimarisi değişmiş bir depo için önbellekteki eski raporu "taze" gibi
+   * okumayı önleyen tek yol budur.
+   */
+  const handleTriggerReview = async (repo: Repository, force = false) => {
+    // Uçuşta bir inceleme varken ikinci kez tetiklemek sunucuda ikinci bir
+    // yapay zeka üretimi (faturalanan çağrı) başlatır; istek yok sayılır.
+    if (isReviewInFlight) return;
+    const requestId = ++reviewRequestRef.current;
+    lastReviewForceRef.current = force;
     setActiveRepoForReview(repo);
-    activeRepoNameRef.current = repo.name;
     setReviewResult(null);
     try {
-      const res = await repoReviewMutation.mutateAsync(repo.name);
-      if (activeRepoNameRef.current === repo.name) {
+      const res = await repoReviewMutation.mutateAsync({ repoName: repo.name, force });
+      if (reviewRequestRef.current === requestId) {
         setReviewResult(res);
       }
     } catch (err) {
-      if (activeRepoNameRef.current === repo.name) {
+      if (reviewRequestRef.current === requestId) {
         console.error('İnceleme alınamadı:', err);
       }
     }
   };
 
+  const closeReviewModal = () => {
+    // Sayaç ilerletilir: uçuştaki yanıt artık güncel sayılmaz ve kapatılan
+    // modala yazmaz.
+    reviewRequestRef.current += 1;
+    setActiveRepoForReview(null);
+    setReviewResult(null);
+  };
+  const reviewDialogRef = useModalA11y(Boolean(activeRepoForReview), closeReviewModal);
+
   const safeRepos = Array.isArray(repositories) ? repositories : [];
 
-  const languages = Array.from(
-    new Set(safeRepos.map((r) => r.language).filter(Boolean))
-  ) as string[];
+  /**
+   * Ölçülmemiş bir sayı "0" olarak yazılmaz: istek sürerken ya da
+   * başarısızken yazılan sıfır, "depo yok" diye okunur (bkz. boş liste metni).
+   * Kural tek kaynakta (bkz. formatters.formatMeasuredCount).
+   */
+  const measuredCount = (count: number): string =>
+    formatMeasuredCount(count, reposError, telemetryLoading);
 
-  const filteredRepos = safeRepos.filter((r) => {
-    const matchesSearch =
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      (r.description && r.description.toLowerCase().includes(search.toLowerCase()));
-    const matchesLang = filterLang === 'ALL' || r.language === filterLang;
-    return matchesSearch && matchesLang;
-  });
+  /**
+   * Boş liste metni. Dört durum dört ayrı cümledir: ölçüm alınamadı, ölçüm
+   * sürüyor, ölçüldü-ve-hesapta depo yok, ölçüldü-ve-arama eşleşmedi. Bunları
+   * birbirine karıştırmak, ölçülmemiş bir sonucu ölçüm gibi sunar.
+   */
+  const reposEmptyMessage = reposError
+    ? `Depo listesi alınamadı: ${reposError} Bu bir "depo yok" sonucu değildir.`
+    : telemetryLoading
+      ? 'Depo listesi yükleniyor; sonuçlar alındığında burada listelenecek.'
+      : safeRepos.length === 0
+        ? 'Analiz edilecek depo bulunmuyor. Depolar GitHub hesabınızdan gelir; liste boşsa başlıktaki "Yenile" düğmesiyle telemetriyi yeniden çekin.'
+        : 'Aramanızla eşleşen depo bulunamadı.';
+
+  // Türev listeler memoize edilir: arama kutusuna yazılan her karakter App'i
+  // yeniden render eder ve memoizasyon olmadan dil listesi yeniden kurulur,
+  // 150 depoların adı/açıklaması `toLowerCase()` ile baştan taranırdı. Arama
+  // terimi döngü DIŞINDA bir kez küçük harfe çevrilir (aynı dönüşüm her depo
+  // için yeniden yapılırdı).
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const languages = React.useMemo(
+    () => Array.from(new Set(safeRepos.map((r) => r.language).filter(Boolean))) as string[],
+    [safeRepos],
+  );
+
+  const filteredRepos = React.useMemo(
+    () =>
+      safeRepos.filter((r) => {
+        const matchesSearch =
+          normalizedSearch.length === 0 ||
+          r.name.toLowerCase().includes(normalizedSearch) ||
+          (r.description ? r.description.toLowerCase().includes(normalizedSearch) : false);
+        const matchesLang = filterLang === 'ALL' || r.language === filterLang;
+        return matchesSearch && matchesLang;
+      }),
+    [safeRepos, normalizedSearch, filterLang],
+  );
+
+  const selectedReposCount = React.useMemo(
+    () => safeRepos.filter((r) => r.selected_for_analysis).length,
+    [safeRepos],
+  );
 
   return (
     <div id="repositories-view" className="space-y-6 font-sans text-[#231c1a]">
@@ -107,13 +214,13 @@ export const RepositoriesView: React.FC<Props> = ({
         <div className="flex items-center gap-3">
           <div className="text-right">
             <span className="text-xs text-[#4a3e3b] block font-bold">Toplam Depo</span>
-            <span className="text-sm font-bold text-[#231c1a]">{safeRepos.length}</span>
+            <span className="text-sm font-bold text-[#231c1a]">{measuredCount(safeRepos.length)}</span>
           </div>
           <div className="w-px h-6 bg-[#a89997]" />
           <div className="text-right">
             <span className="text-xs text-[#4a3e3b] block font-bold">Analiz Edilen</span>
             <span className="text-sm font-bold text-[#231c1a]">
-              {safeRepos.filter((r) => r.selected_for_analysis).length}
+              {measuredCount(selectedReposCount)}
             </span>
           </div>
         </div>
@@ -129,24 +236,30 @@ export const RepositoriesView: React.FC<Props> = ({
             placeholder="Depo adı veya açıklamaya göre ara..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#a89997] bg-[#b9aba9]/35 text-xs text-[#231c1a] placeholder-[#6e5f5c] focus:outline-none focus:border-[#f9b88e] transition-colors"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#a89997] bg-[#b9aba9]/35 text-xs text-[#231c1a] placeholder-[#4a3e3b] focus:outline-none focus:border-[#f9b88e] transition-colors"
           />
         </div>
 
         {/* Dil Filtresi Hapları */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          {/* `aria-pressed`: etkin filtre yalnızca renkle ayırt ediliyor; ekran
+              okuyucu için seçili durumu bildiren tek kanal bu özniteliktir. */}
           <button
+            type="button"
+            aria-pressed={filterLang === 'ALL'}
             onClick={() => setFilterLang('ALL')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${filterLang === 'ALL'
               ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
               : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
               }`}
           >
-            Tümü ({safeRepos.length})
+            Tümü ({measuredCount(safeRepos.length)})
           </button>
           {languages.map((lang) => (
             <button
               key={lang}
+              type="button"
+              aria-pressed={filterLang === lang}
               onClick={() => setFilterLang(lang)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${filterLang === lang
                 ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
@@ -162,8 +275,12 @@ export const RepositoriesView: React.FC<Props> = ({
       {/* Depolar Listesi */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredRepos.length === 0 ? (
-          <div className="col-span-full p-8 rounded-xl border border-[#a89997] bg-[#cdc1b5] text-center text-xs text-[#6e5f5c]">
-            Aramanızla eşleşen depo bulunamadı.
+          <div className="col-span-full p-8 rounded-xl border border-[#a89997] bg-[#cdc1b5] text-center text-xs text-[#4a3e3b]">
+            {/* Başarısız bir istek "depo yok" olarak gösterilmez: liste hiç
+                gelmediyse bu bir ölçümsüz durumdur, hesabın deposuz olduğu
+                değil (bkz. HotspotsView/OverviewView'daki aynı ayrım). Süren
+                bir istek için de aynısı geçerlidir. */}
+            {reposEmptyMessage}
           </div>
         ) : (
           filteredRepos.map((repo) => {
@@ -179,7 +296,7 @@ export const RepositoriesView: React.FC<Props> = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      {(repo.is_private ?? repo.private) ? (
+                      {repo.is_private ? (
                         <Lock className="w-3.5 h-3.5 text-[#4a3e3b] shrink-0" />
                       ) : (
                         <Globe className="w-3.5 h-3.5 text-[#4a3e3b] shrink-0" />
@@ -260,20 +377,31 @@ export const RepositoriesView: React.FC<Props> = ({
 
                   <div className="flex items-center justify-between gap-2">
                     <button
+                      type="button"
                       onClick={() => onToggleRepo(String(repo.id))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${isSelected
+                      disabled={pendingRepoId === String(repo.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait ${isSelected
                         ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
                         : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
                         }`}
                     >
-                      {isSelected ? 'Analizde Dahil' : 'Analize Ekle'}
+                      {pendingRepoId === String(repo.id)
+                        ? 'Kaydediliyor...'
+                        : isSelected
+                          ? 'Analizde Dahil'
+                          : 'Analize Ekle'}
                     </button>
 
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => handleTriggerReview(repo)}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 hover:brightness-105 transition-all cursor-pointer shadow-xs flex items-center gap-1"
-                        title="Gemini ile kapsamlı depo incelemesi"
+                        disabled={isReviewInFlight}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 hover:brightness-105 transition-all cursor-pointer shadow-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={
+                          isReviewInFlight
+                            ? 'Bir inceleme sürüyor; tamamlanınca yeniden deneyebilirsiniz'
+                            : 'Gemini ile kapsamlı depo incelemesi'
+                        }
                       >
                         <Sparkles className="w-3 h-3 text-[#231c1a]" />
                         <span>İncele</span>
@@ -297,7 +425,14 @@ export const RepositoriesView: React.FC<Props> = ({
 
       {/* Yapay Zeka Depo İnceleme Rapor Modalı */}
       {activeRepoForReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto font-sans">
+        <div
+          ref={reviewDialogRef}
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="repo-review-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto font-sans focus:outline-none"
+        >
           <div className="w-full max-w-2xl p-6 rounded-2xl border border-[#a89997] bg-[#cdc1b5] space-y-5 shadow-2xl animate-in zoom-in-95 my-8 text-[#231c1a]">
             {/* Modal Başlığı */}
             <div className="flex items-center justify-between border-b border-[#a89997] pb-4">
@@ -306,7 +441,7 @@ export const RepositoriesView: React.FC<Props> = ({
                   <Brain className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-[#231c1a]">
+                  <h3 id="repo-review-title" className="text-sm font-bold text-[#231c1a]">
                     {activeRepoForReview.name} — Kensai Mimari İnceleme
                   </h3>
                   <span className="text-[11px] text-[#4a3e3b] block mt-0.5 font-medium">
@@ -316,10 +451,7 @@ export const RepositoriesView: React.FC<Props> = ({
               </div>
 
               <button
-                onClick={() => {
-                  setActiveRepoForReview(null);
-                  setReviewResult(null);
-                }}
+                onClick={closeReviewModal}
                 aria-label="İnceleme penceresini kapat"
                 className="p-1.5 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-[#231c1a] hover:brightness-105 cursor-pointer transition-all"
               >
@@ -337,7 +469,7 @@ export const RepositoriesView: React.FC<Props> = ({
                   KENSAI depo telemetrisini ve commit geçmişini inceliyor...
                 </p>
                 <p className="text-xs text-[#4a3e3b]">
-                  Mimari güçlü yönler, riskler ve 14 günlük aksiyon planı sentezleniyor
+                  Mimari güçlü yönler, teknik borçlar ve önceliklendirilmiş aksiyon planı sentezleniyor
                 </p>
               </div>
             )}
@@ -354,7 +486,7 @@ export const RepositoriesView: React.FC<Props> = ({
                 <div className="flex justify-center gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => handleTriggerReview(activeRepoForReview)}
+                    onClick={() => handleTriggerReview(activeRepoForReview, lastReviewForceRef.current)}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 hover:brightness-105 transition-all cursor-pointer shadow-xs"
                   >
                     Tekrar Dene
@@ -389,6 +521,13 @@ export const RepositoriesView: React.FC<Props> = ({
                   </div>
                   <p className="text-xs text-[#231c1a] font-medium leading-relaxed">
                     {reviewResult.architectureOverview}
+                  </p>
+                  {/* Raporun yaşı gösterilir: sunucu taze incelemeyi 7 güne kadar
+                      önbellekten servis eder (bkz. FirestoreService.REVIEW_TTL_MS),
+                      tarih yazılmazsa günler önce üretilmiş bir rapor güncel
+                      sanılırdı. Yeniden üretme yolu da bu satırda anılır. */}
+                  <p className="text-[10px] text-[#4a3e3b] font-medium pt-1 border-t border-[#a89997]/60">
+                    İnceleme tarihi: {formatDate(reviewResult.reviewedAt) || 'bilinmiyor'} · Rapor 7 gün boyunca önbellekten servis edilir; güncel telemetriyle yeniden üretmek için "Yeniden Üret" düğmesini kullanın.
                   </p>
                 </div>
 
@@ -455,12 +594,14 @@ export const RepositoriesView: React.FC<Props> = ({
                   </div>
                 )}
 
-                {/* 14 Günlük Mühendislik Aksiyon Planı / Yol Haritası */}
+                {/* Önceliklendirilmiş Mühendislik Aksiyon Planı: model yalnızca
+                    başlık/açıklama/öncelik üretir (bkz. RepoAiReview.recommendedRoadmap),
+                    gün bazlı bir takvim değildir. */}
                 {reviewResult.recommendedRoadmap && reviewResult.recommendedRoadmap.length > 0 && (
                   <div className="space-y-2">
                     <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
-                      <span>14 Günlük Mühendislik Aksiyon Planı</span>
+                      <span>Önceliklendirilmiş Mühendislik Aksiyon Planı</span>
                     </h4>
                     <div className="space-y-2">
                       {reviewResult.recommendedRoadmap.map((item, idx: number) => {
@@ -501,6 +642,13 @@ export const RepositoriesView: React.FC<Props> = ({
 
                 {/* Alt Butonlar */}
                 <div className="pt-3 border-t border-[#a89997] flex justify-end gap-2">
+                  <button
+                    onClick={() => handleTriggerReview(activeRepoForReview, true)}
+                    disabled={isReviewInFlight}
+                    className="px-3 py-2 rounded-lg text-xs font-bold border border-[#231c1a]/15 bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    Yeniden Üret
+                  </button>
                   <button
                     onClick={() => {
                       onAskAboutRepo(activeRepoForReview.name);

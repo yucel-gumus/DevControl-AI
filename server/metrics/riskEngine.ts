@@ -1,4 +1,5 @@
 import { CommitMetric, PullRequestMetric, IssueMetric, Repository, FileHotspot, EngineeringRisk } from '../../src/types.js';
+import { formatTrNumber } from '../../src/utils/formatters.js';
 import { MS_PER_HOUR, STALE_ISSUE_THRESHOLD_DAYS } from '../constants.js';
 
 export class RiskEngine {
@@ -25,7 +26,6 @@ export class RiskEngine {
         category: 'CODE_HOTSPOT',
         affectedRepository: hotspot.repo_name,
         repo_name: hotspot.repo_name,
-        affectedFiles: [hotspot.path],
         summary: `${hotspot.path} modülü sürekli değişiklik ve hata düzeltmesi yaşamakta olup, yüksek yapısal bağımlılık veya kararsız gereksinim sınırlarına işaret etmektedir.`,
         evidence: [
           {
@@ -41,7 +41,7 @@ export class RiskEngine {
           },
           {
             metric: 'Kod Dalgalanması (Churn)',
-            value: `${hotspot.code_churn.toLocaleString()} satır`,
+            value: `${formatTrNumber(hotspot.code_churn)} satır`,
             description: `Yüksek satır ekleme/silme oranı, kararlı genişletmeler yerine sürekli değişen mantığı göstermektedir.`,
           },
           {
@@ -58,6 +58,14 @@ export class RiskEngine {
     });
 
     // 2. Teslimat Darboğazı / Durgun PR Riski
+    //
+    // KAPSAM: Bu risk TEK bir PR'ı (en uzun süredir açık olanı) ölçer ve o
+    // PR'ın deposuna yazılır — depo bazlı sorgularda görünmesi doğrudur.
+    // Durgun PR SAYISI ise tüm seçili depolar üzerinden ölçülür; sayıyı başlığa
+    // ya da depo bazlı bir kanıt satırına "bu deponun" sayısı gibi yazmak,
+    // sayaçla atfı çelişen bir ölçüm üretirdi (bkz. 3./4./5. risklerdeki aynı
+    // kural). Bu yüzden portföy sayısı yalnızca kapsamı metrik adında ve
+    // açıklamasında açıkça belirtilen bir kanıt satırında verilir.
     const stalePRs = prs.filter((p) => p.state === 'open' && Boolean(p.is_stale));
     if (stalePRs.length > 0) {
       const topStale = stalePRs[0];
@@ -68,7 +76,7 @@ export class RiskEngine {
       const openAgeDays = Math.max(1, Math.round(openAgeHours / 24));
       risks.push({
         id: `risk_delivery_stale_pr`,
-        title: `Teslimat Darboğazı: İnceleme bekleyen ${stalePRs.length} uzun süreli açık Çekme İsteği (PR)`,
+        title: `Teslimat Darboğazı: #${topStale.number} numaralı PR ${openAgeDays} gündür inceleme bekliyor`,
         severity: 'HIGH',
         category: 'DELIVERY_BOTTLENECK',
         affectedRepository: topStale.repo_name,
@@ -87,9 +95,9 @@ export class RiskEngine {
             description: `Büyük PR boyutu inceleme yorgunluğu yaratır ve hata kaçırma oranını artırır.`,
           },
           {
-            metric: 'Durgun PR Hacmi',
+            metric: 'Durgun PR Hacmi (tüm seçili depolar)',
             value: `${stalePRs.length} açık PR`,
-            description: `Konsensüs veya entegrasyon olmadan askıda bekleyen birden fazla paralel dal.`,
+            description: `Tüm seçili depolar genelinde askıda bekleyen durgun PR sayısı; bu kayıt yalnızca #${topStale.number} için açık kalma süresini ve boyutunu ölçer.`,
           },
         ],
         confidence: 89,
@@ -106,14 +114,20 @@ export class RiskEngine {
     }));
     if (docIssues.length > 0) {
       const targetIssue = docIssues[0];
+      // Kanıt satırı `${docIssues.length} açık kayıt` derken kapsam PORTFÖY
+      // GENELİDİR (tüm seçili depoların issue'ları taranır); riski
+      // `docIssues[0]`'ın deposuna yazmak, sayaçla çelişen uydurma bir atıf
+      // üretir ve depo bazlı risk sorguları onu gerçek sanar. Kapsam, aynı
+      // düzeltmenin uygulandığı 5. risk bloğuyla aynı biçimde işaretlenir.
       risks.push({
         id: `risk_doc_drift`,
-        title: `${targetIssue.repo_name} Deposunda Dokümantasyon ve Mimari Şema Kayması`,
+        title: `Dokümantasyon ve Mimari Şema Kayması (${docIssues.length} açık kayıt)`,
         severity: 'MEDIUM',
         category: 'DOCUMENTATION_GAP',
-        affectedRepository: targetIssue.repo_name,
-        repo_name: targetIssue.repo_name,
-        summary: `Depoda güncel dağıtım planları, mimari şema dokümantasyonu ve API sözleşmeleri eksiktir.`,
+        affectedRepository: '',
+        repo_name: '',
+        scope: 'portfolio',
+        summary: `Güncel dağıtım planları, mimari şema dokümantasyonu ve API sözleşmeleri eksiktir.`,
         evidence: [
           {
             metric: 'Dokümantasyon / Teknik Borç Sorunları',
@@ -142,8 +156,12 @@ export class RiskEngine {
         title: `Çözülmemiş Teknik Borç Birikimi (${staleIssues.length} geciken madde)`,
         severity: 'LOW',
         category: 'TECHNICAL_DEBT',
-        affectedRepository: staleIssues[0].repo_name,
-        repo_name: staleIssues[0].repo_name,
+        // Durgun madde sayısı tüm seçili depolar üzerinden ölçülür; başlık ve
+        // kanıt sayacı portföy geneli olduğu hâlde risk `staleIssues[0]`'ın
+        // deposuna yazılıyordu (bkz. 3. ve 5. risklerdeki aynı düzeltme).
+        affectedRepository: '',
+        repo_name: '',
+        scope: 'portfolio',
         summary: `Backlog maddeleri ve mimari refactoring talepleri standart önceliklendirme sürelerinin ötesine uzamış durumdadır.`,
         evidence: [
           {
@@ -164,14 +182,19 @@ export class RiskEngine {
     const bugFixCommits = commits.filter((c) => c.is_bug_fix);
     const bugFixRatio = commits.length > 0 ? bugFixCommits.length / commits.length : 0;
     if (commits.length >= 10 && bugFixRatio >= 0.35) {
-      const topRepo = repositories[0]?.name || commits[0]?.repo_name || 'Kişisel Depo';
+      // Bu oran PORTFÖY GENELİDİR: tüm seçili depoların commit'leri üzerinden
+      // hesaplanır, tek bir depoya ait değildir. Depo adı yazmak (eskiden
+      // sıralamadaki ilk depo yazılıyordu) riski rastgele bir deponun üzerine
+      // yıkar; "en istikrarlı depo" karşılaştırması ve depo bazlı risk
+      // sorguları da bu uydurma atfı gerçek sanır. Kapsam açıkça işaretlenir.
       risks.push({
         id: 'risk_bugfix_regression_surge',
         title: `Yüksek Hata Düzeltme Yoğunluğu (%${Math.round(bugFixRatio * 100)} Hata Oranı)`,
         severity: 'HIGH',
         category: 'QUALITY_REGRESSION',
-        affectedRepository: topRepo,
-        repo_name: topRepo,
+        affectedRepository: '',
+        repo_name: '',
+        scope: 'portfolio',
         summary: `Son commit akışının %${Math.round(bugFixRatio * 100)}'lik kısmı hata düzeltmelerinden oluşuyor. Bu durum son değişikliklerde regresyon yaşandığına işaret etmektedir.`,
         evidence: [
           {

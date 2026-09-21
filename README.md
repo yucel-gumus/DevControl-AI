@@ -42,10 +42,17 @@ Bu proje **[Yücel Gümüş](https://yucelgumus.dev/)** tarafından sıfırdan t
 
 ### 3. 🤖 Google Gemini Yapay Zeka Entegrasyonu
 - **Geliştirici Personası (Developer Persona)**: Son 7 günlük commit telemetriniz ve dilleriniz üzerinden teknik unvanınızı, süper güçlerinizi ve gelişim alanlarınızı sentezler.
-- **Yapay Zeka Analisti (Ask AI / Agent Planner)**: Projeleriniz hakkında teknik sorular sorabileceğiniz, arka planda telemetri araçlarını (`get_hotspots`, `get_health_score`, vb.) çalıştıran otonom analist.
-- **Depo İnceleme Raporu (AI Repo Review)**: Tek tıkla herhangi bir deponun mimarisini, güçlü yanlarını ve 14 günlük aksiyon planını çıkaran inceleme modalı.
+- **KENSAI — Yapay Zeka Analisti (Ask AI / Agent Planner)**: Projeleriniz hakkında teknik sorular sorabileceğiniz, arka planda telemetri araçlarını (`get_hotspots`, `get_health_breakdown`, `get_engineering_risks`, vb.) çalıştıran otonom analist. Arayüzdeki adı (başlık düğmesi, sohbet balonları, inceleme modalları) **KENSAI**'dir; aynı ad sunucudaki ajan sistem isteminde de kullanılır, böylece model kendini arayüzde göründüğü adla tanıtır.
+- **Depo İnceleme Raporu (AI Repo Review)**: Tek tıkla herhangi bir deponun mimarisini, güçlü yanlarını, teknik borçlarını ve önceliklendirilmiş (Yüksek/Orta/Düşük) aksiyon planını çıkaran inceleme modalı.
 - **Yeniden Düzenleme Planı (AI Refactoring Blueprint)**: Kritik dosyalardaki karmaşık modüller için somut SOLID / SRP refactoring adımları ve kod şablonları önerir.
-- **Çoklu Model Yedekleme Zinciri (Fallback Chain)**: `gemini-3.8-flash` -> `gemini-3.7-flash` -> `gemini-3.6-flash` -> `gemini-3.5-flash-lite` -> `gemini-2.5-flash` -> `gemini-2.0-flash` -> `gemini-1.5-flash`.
+- **Çoklu Model Yedekleme Zinciri (Fallback Chain)**: `gemini-3.8-flash` -> `gemini-3.7-flash` -> `gemini-3.6-flash` -> `gemini-3.5-flash` -> `gemini-3.5-flash-lite`. Zincir en yetenekli modelden başlar; geçici hatalarda (429 / 503 / zaman aşımı) üstel geri çekilme ile sıradaki modele düşer.
+
+### 4. 🎯 TypeSafe AI System One (Jev) Karar Katmanı
+`TYPESAFE_API_KEY` tanımlıysa ajan planlayıcısı, LLM sentezinden **önce** ve **sonra** iki deterministik karar adımı çalıştırır:
+- **Niyet Yönlendirmesi (Intent Routing)**: Kullanıcı sorgusunu ve depo bağlamını `state` olarak gönderir; tek bir System One çağrısında `choice` (hangi araçlar çalıştırılmalı), `noul` (sorgu doğrudan bir metrikle yanıtlanabilir mi) ve `score` (aciliyet) sorularını yanıtlar. Araç seçimini belirleyen `choice` ve istemi biçimlendiren `score` yanıtları güveni `0.45`in altındaysa yok sayılır; `noul` yanıtı güven alanı taşımadığı için kendi değer eşiğiyle (`noul < 0.7`) süzülür.
+- **Kanıt Doğrulaması (Fact-Check)**: Gemini sentezinden sonra üretilen yanıt, çalıştırılan araçların gerçek çıktılarıyla karşılaştırılır. `noul` değeri 0.5'in altındaysa yanıtın sonuna kullanıcıya görünen bir **Kanıt Doğrulama Uyarısı** eklenir.
+
+TypeSafe erişilemezse (anahtar yok, ağ hatası, 429) ajan sessizce Gemini-only moduna düşer; uydurma bir cevap üretilmez. Gemini de erişilemezse yanıt, ölçülen telemetriden üretilen deterministik bir özetle verilir (bkz. `AgentPlanner.generateTelemetryFallback`).
 
 ---
 
@@ -60,8 +67,8 @@ Arayüz, modern geliştirici araçları estetiği ve UI/UX standartları gözeti
 
 ## 🛠️ Teknoloji Yığını
 
-- **Frontend**: React 19, TypeScript, TailwindCSS, Recharts, Lucide React, Motion, TanStack React Query
-- **Backend**: Node.js, Express, Google GenAI SDK (`@google/genai`), express-rate-limit
+- **Frontend**: React 19, TypeScript, TailwindCSS, Recharts, Lucide React, TanStack React Query
+- **Backend**: Node.js, Express, Google GenAI SDK (`@google/genai`), TypeSafe AI System One (Jev), express-rate-limit
 - **Bulut & Dağıtım**: Google Cloud Run, Google Cloud Secret Manager, Firebase Hosting, Docker (Multi-stage Alpine)
 - **Araçlar & Derleme**: Vite 6, esbuild, tsx watch
 
@@ -70,7 +77,7 @@ Arayüz, modern geliştirici araçları estetiği ve UI/UX standartları gözeti
 ## 🚀 Hızlı Başlangıç
 
 ### 1. Gereksinimler
-- **Node.js**: v18 veya üzeri
+- **Node.js**: v22 veya üzeri (üretim imajı `node:22-alpine`; `package.json` içindeki `engines` alanı bu alt sınırı bildirir)
 - **GitHub Personal Access Token**: `repo` ve `read:user` yetkili bir token ([Oluşturma Bağlantısı](https://github.com/settings/tokens))
 - **Google Gemini API Key**: [Google AI Studio](https://aistudio.google.com/)'dan alınan ücretsiz API anahtarı
 
@@ -95,9 +102,36 @@ GEMINI_API_KEY="AIzaSy..."
 
 # GitHub Personal Access Token (yalnızca kendi hesabınız kullanılır)
 GITHUB_TOKEN="ghp_..."
+
+# TypeSafe AI System One (Jev) — opsiyonel karar katmanı
+TYPESAFE_API_KEY="ts_..."
 ```
 
-> **Önemli Güvenlik Notu**: `.env` dosyası `.gitignore` ve `.dockerignore` ile korunmaktadır. API anahtarlarınız ve GitHub tokenınız asla istemciye veya git reposuna sızdırılmaz.
+> **Önemli Güvenlik Notu**: `.env` dosyası `.gitignore` ve `.dockerignore` ile korunmaktadır. API anahtarlarınız, TypeSafe anahtarınız ve GitHub tokenınız asla istemciye veya git reposuna sızdırılmaz. `TYPESAFE_API_KEY` de dahil tüm gizli anahtarlar yalnızca sunucu tarafında `process.env` üzerinden okunur; istemci paketine gömülmez.
+
+### 3.1. Opsiyonel: API Erişim Kapısı
+`DEVCONTROL_API_TOKEN` tanımlarsanız `/api/health` dışındaki tüm `/api/*` uç noktaları bir jeton ister (`Authorization: Bearer <jeton>` veya `X-Api-Token: <jeton>`, sabit zamanlı karşılaştırma ile). Sağlık ucu jeton istemez: dış izleme (uptime / readiness) probları jeton taşımaz ve kapı açıkken 401 alsalardı sağlıklı bir sürüm sağlıksız sayılırdı. Tarayıcıdan kullanmak için jetonu bir kez localStorage'a yazın:
+
+```js
+localStorage.setItem('devcontrol_api_token', '<jeton>')
+```
+
+Boş bırakılırsa kapı devre dışıdır ve uygulama eskisi gibi çalışır. Bu özellik, uygulamayı herkese açık bir adrese dağıttığınızda GitHub tokenınızın sizin adınıza kullanılmasını engellemek içindir.
+
+### 3.2. Zaman Aşımları ve Uç (Edge) Sınırı
+
+`firebase.json` tüm istekleri (`"source": "**"`) Cloud Run servisine rewrite eder ve **Firebase Hosting, Cloud Run'a proxy'lediği bir isteği 60 saniyede keser** (bu sınır yükseltilemez; kesilen istek istemciye 504 ağ geçidi sayfası olarak döner). Cloud Run'ın kendi zaman aşımı bu yüzden hiçbir zaman bağlayıcı olmaz.
+
+İstemci, uç katmanın keseceği bir isteği beklemek yerine kendi iptalini yapar: `src/utils/apiClient.ts` içindeki bütçe, uç sınırına indirgenir (5 sn emniyet payıyla) ve kullanıcıya ayrıştırılamayan bir 504 yerine "İstek zaman aşımına uğradı" mesajı gösterilir. Uç sınırı **olmayan** kurulumlarda (doğrudan Cloud Run adresi, yerel `npm start`) tam bütçelerin kullanılabilmesi için sınır `VITE_EDGE_TIMEOUT_MS` ile bildirilir (derleme anında pakete gömülür):
+
+```env
+# Uç katmanı yoksa (doğrudan Cloud Run / yerel çalıştırma): sınırı kapat
+VITE_EDGE_TIMEOUT_MS=0
+# Ya da gerçek sınırı bildir (ör. 300 sn):
+# VITE_EDGE_TIMEOUT_MS=300000
+```
+
+> **Dağıtım notu (darboğaz)**: Hosting arkasında 60 sn'yi aşan bir istek hiçbir zaman sonuç döndüremez. Soğuk başlangıçta ilk GitHub eşitlemesi bu süreyi aşabilir; bu durumda eşitlemeyi bekleyen uçlar (brifing, persona, depo incelemesi) istemci tarafından iptal edilir ve sunucu ölçüm üretmeye devam eder. Kalıcı çözüm, eşitlemeyi istekten ayırmaktır (eşitlemeyi arka planda başlatıp istemciyi durum yoklamasına yönlendirmek); uygulama şu an eşitlemeyi istek içinde yapar ve bu sınırla yaşar.
 
 ### 4. Uygulamayı Çalıştırma
 Geliştirme sunucusunu başlatın:
@@ -112,9 +146,9 @@ Uygulama otomatik olarak `http://localhost:3000` adresinde açılacaktır.
 
 | Komut | Açıklama |
 | :--- | :--- |
-| `npm run dev` | Frontend ve Backend'i canlı yenileme (`tsx watch`) ile başlatır |
+| `npm run dev` | Frontend ve Backend'i canlı yenileme (`tsx watch`) ile başlatır; istemciyi Vite ara katmanından (kaynak koddan) servis eder |
 | `npm run build` | Üretim için optimize edilmiş bundle'ı (`dist/`) derler |
-| `npm start` | Derlenmiş üretim sunucusunu çalıştırır |
+| `npm start` | Derlenmiş paketi (`dist/server.cjs`) çalıştırır ve istemciyi `dist/` içinden servis eder (önce `npm run build` gerekir; derlenmiş çıktı yoksa sunucu açık bir hata mesajıyla başlamaz) |
 | `npm run lint` | TypeScript tip denetimini (`tsc --noEmit`) çalıştırır |
 
 ---
@@ -122,7 +156,8 @@ Uygulama otomatik olarak `http://localhost:3000` adresinde açılacaktır.
 ## 🔒 Gizlilik ve Güvenlik
 - Sistemde **hiçbir sahte (mock / dummy)** veri bulunmaz.
 - Arayüzden token değiştirme devre dışıdır; sunucu tamamen yerel `.env` veya Google Cloud Secret Manager üzerinden çalışır.
-- GitHub verileriniz üçüncü şahıs sunuculara iletilmez, yalnızca kendi oturumunuzda analiz edilir.
+- **Deterministik motorlar yereldir**: sağlık skoru, hotspot, risk ve aktivite hesapları kendi sunucunuzda çalışır ve hiçbir ağ çağrısı yapmaz.
+- **Üçüncü taraf veri akışı (şeffaflık)**: Yapay zeka özellikleri (Ask AI, geliştirici personası, depo incelemesi, commit sınıflandırma) için GitHub telemetrisinden **türetilmiş bağlam** — commit mesajları, dosya yolları, PR/issue başlıkları ve depo meta verileri — Google Gemini API'sine (`generativelanguage.googleapis.com`) gönderilir. `TYPESAFE_API_KEY` tanımlıysa veri TypeSafe AI'a (`api.typesafe.ai`) iki adımda da gider: **niyet yönlendirmesinde** sorunuzun metni, hedef depo adı ve izlenen depo adları; **kanıt doğrulamasında** ölçülen projeksiyon (hedef/izlenen depo adları, sağlık skoru, risk seviyesi, dil, fork ve yıldız sayıları, araç sonuçlarından üretilen kanıt satırları, telemetri durumu) ile üretilen yapay zeka cevabının ilk 4000 karakteri (`yapayZekaCevabi`). **Hiçbir ağ çağrısı yapılmayan tek durum, iki anahtarın da tanımlı olmamasıdır**: `GEMINI_API_KEY` yoksa yapay zeka sentezi (Gemini) hiç çağrılmaz; ancak `TYPESAFE_API_KEY` tanımlıysa yalnızca niyet yönlendirmesi ve kanıt doğrulaması adımları TypeSafe üzerinden çalışır ve yukarıdaki bağlam TypeSafe'e gider. API anahtarları, GitHub tokenınız ve ham depo içeriği (dosya gövdeleri) bu isteklerin dışında tutulur; bunların dışında hiçbir üçüncü tarafa veri aktarılmaz.
 
 ---
 

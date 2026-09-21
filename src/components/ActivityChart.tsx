@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { CHART_THEME } from '../theme.js';
 
-export interface ActivityChartItem {
+interface ActivityChartItem {
   date: string;
   commits: number;
   bugFixes: number;
@@ -19,32 +19,40 @@ interface ActivityChartProps {
   chartData: ActivityChartItem[];
 }
 
-export const ActivityChart: React.FC<ActivityChartProps> = ({ chartData }) => {
+const ActivityChartComponent: React.FC<ActivityChartProps> = ({ chartData }) => {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={chartData}>
         <defs>
           <linearGradient id="commitGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#f9b88e" stopOpacity={0.9} />
-            <stop offset="95%" stopColor="#f9b88e" stopOpacity={0.0} />
+            <stop offset="5%" stopColor={CHART_THEME.seriesPrimaryFill} stopOpacity={0.9} />
+            <stop offset="95%" stopColor={CHART_THEME.seriesPrimaryFill} stopOpacity={0.0} />
           </linearGradient>
+          {/* Hata düzeltmesi serisi kart zemininden (#cdc1b5) ayırt edilebilmeli:
+              kanvas grisi (#b9aba9) dolgu olarak zemine karışıp seriyi görünmez
+              kılıyordu; aynı paletin koyu grisi (#6e5f5c) kullanılır. */}
           <linearGradient id="bugGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#b9aba9" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#b9aba9" stopOpacity={0.0} />
+            <stop offset="5%" stopColor={CHART_THEME.seriesSecondaryFill} stopOpacity={0.75} />
+            <stop offset="95%" stopColor={CHART_THEME.seriesSecondaryFill} stopOpacity={0.05} />
           </linearGradient>
         </defs>
         <XAxis
           dataKey="date"
-          stroke="#6e5f5c"
+          stroke={CHART_THEME.axisText}
           fontSize={11}
           tickLine={false}
-          axisLine={{ stroke: '#a89997' }}
+          axisLine={{ stroke: CHART_THEME.axisLine }}
         />
+        {/* `allowDecimals={false}`: eksen iki tam sayı metriği taşır (commit ve
+            hata düzeltmesi). Sakin bir haftada en yüksek değer 2 olduğunda
+            Recharts keneleri 0,5 / 1,5 gibi değerlerle etiketler ve "0,5
+            commit" diye okunamayan bir ölçek çizerdi. */}
         <YAxis
-          stroke="#6e5f5c"
+          stroke={CHART_THEME.axisText}
           fontSize={11}
           tickLine={false}
-          axisLine={{ stroke: '#a89997' }}
+          axisLine={{ stroke: CHART_THEME.axisLine }}
+          allowDecimals={false}
         />
         <Tooltip
           contentStyle={{
@@ -59,7 +67,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({ chartData }) => {
         <Area
           type="monotone"
           dataKey="commits"
-          stroke="#231c1a"
+          stroke={CHART_THEME.seriesPrimaryStroke}
           strokeWidth={2}
           fillOpacity={1}
           fill="url(#commitGrad)"
@@ -68,7 +76,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({ chartData }) => {
         <Area
           type="monotone"
           dataKey="bugFixes"
-          stroke="#6e5f5c"
+          stroke={CHART_THEME.seriesSecondaryStroke}
           strokeWidth={1.5}
           fillOpacity={1}
           fill="url(#bugGrad)"
@@ -79,4 +87,13 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({ chartData }) => {
   );
 };
 
-export default ActivityChart;
+/**
+ * Grafik, `chartData` referansı değişmedikçe yeniden çizilmez: Recharts
+ * çizimi pahalıdır ve ebeveyn karttaki ilgisiz bir durum güncellemesi
+ * (ör. modal açma) tüm seriyi yeniden hesaplamamalıdır.
+ *
+ * Bileşen yalnızca varsayılan dışa aktarımla sunulur: tek tüketicisi
+ * `React.lazy` dinamik içe aktarımıdır ve ikinci bir adlandırılmış kopya,
+ * iki girişten birinin güncellenmeden kalması riskini taşır.
+ */
+export default React.memo(ActivityChartComponent);

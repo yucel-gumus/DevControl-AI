@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, HelpCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { formatConfidence } from '../utils/formatters.js';
+import { useModalA11y } from '../hooks/useModalA11y.js';
 
 export interface ExplainWhyData {
   title: string;
@@ -24,11 +25,17 @@ export const ExplainWhyModal: React.FC<Props> = ({
   onClose,
   data,
 }) => {
+  // Kanca koşullu `return`ten ÖNCE çağrılmalıdır (hooks kuralı); bu yüzden
+  // `isOpen` kancaya açıkça geçirilir.
+  const dialogRef = useModalA11y(isOpen, onClose);
+
   if (!isOpen || !data) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto font-sans"
+      ref={dialogRef}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto font-sans focus:outline-none"
       role="dialog"
       aria-modal="true"
       aria-labelledby="explain-modal-title"

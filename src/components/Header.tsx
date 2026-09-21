@@ -1,6 +1,7 @@
 import React from 'react';
 import { RefreshCw, Terminal, Activity, Gauge, Database } from 'lucide-react';
 import { EngineeringHealthScore, RateLimitStatus } from '../types.js';
+import { formatDate, formatTime, formatTrNumber } from '../utils/formatters.js';
 
 interface Props {
   title: string;
@@ -29,6 +30,16 @@ export const Header: React.FC<Props> = ({
 }) => {
   const isPartial = healthScore?.dataStatus === 'partial';
 
+  /**
+   * Son eşitleme etiketi tek kaynaktan üretilir (bkz. formatters).
+   *
+   * Çıplak `new Date(...).toLocaleString()` iki sorun taşır: yerel ayarı
+   * ortama bırakır ve ayrıştırılamayan bir damgada "Invalid Date" basar.
+   * Biçimlendiriciler geçersiz girdide boş dizgi döndürdüğü için damga
+   * gerçekten yoksa etiket hiç gösterilmez.
+   */
+  const lastSyncLabel = lastSyncAt ? `${formatDate(lastSyncAt)} ${formatTime(lastSyncAt)}`.trim() : '';
+
   return (
     <header
       id="app-header"
@@ -37,7 +48,7 @@ export const Header: React.FC<Props> = ({
       {/* Başlık ve Gezinme Yolu */}
       <div className="flex items-center gap-2 text-xs">
         <span className="text-[#4a3e3b] font-medium">DevControl</span>
-        <span className="text-[#6e5f5c]">/</span>
+        <span className="text-[#4a3e3b]">/</span>
         <span className="text-[#231c1a] font-bold text-sm">{title}</span>
         {subtitle && (
           <span className="hidden lg:inline text-xs text-[#4a3e3b] pl-2 ml-1 border-l border-[#a89997]">
@@ -53,8 +64,8 @@ export const Header: React.FC<Props> = ({
           <div
             className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border border-[#a89997] bg-[#b9aba9]/40 text-[#231c1a] shadow-xs"
             title={
-              lastSyncAt
-                ? `Son eşitleme: ${new Date(lastSyncAt).toLocaleString('tr-TR')}`
+              lastSyncLabel
+                ? `Son eşitleme: ${lastSyncLabel}`
                 : 'Henüz başarılı bir eşitleme yapılmadı.'
             }
           >
@@ -68,7 +79,7 @@ export const Header: React.FC<Props> = ({
         ) : healthScore ? (
           <div
             className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs border border-[#a89997] bg-[#b9aba9]/40 text-[#4a3e3b]"
-            title={lastSyncAt ? `Son eşitleme: ${new Date(lastSyncAt).toLocaleString('tr-TR')}` : undefined}
+            title={lastSyncLabel ? `Son eşitleme: ${lastSyncLabel}` : undefined}
           >
             <Activity className="w-3.5 h-3.5 text-[#4a3e3b]" />
             <span className="text-[11px]">GitHub verisi bekleniyor</span>
@@ -82,7 +93,7 @@ export const Header: React.FC<Props> = ({
             title={`GitHub API Kalan İstek: ${rateLimitStatus.remaining} / ${rateLimitStatus.limit}`}
           >
             <Gauge className="w-3 h-3 text-[#4a3e3b]" />
-            <span>API: {rateLimitStatus.remaining.toLocaleString()}</span>
+            <span>API: {formatTrNumber(rateLimitStatus.remaining)}</span>
           </div>
         )}
 

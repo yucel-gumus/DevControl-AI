@@ -4,35 +4,42 @@
   /* ==========================================================================
      DEVCONTROL AI — 3 RENK MERKEZİ PALET (60 - 30 - 10 KURALI)
      İstenen 3 renk: #b9aba9, #f9b88e, #cdc1b5
+
+     Paletin kendisi (üç hex) ve tipografi mürekkebi burada tanımlıdır; rol
+     takma adları (`--dominant-bg` gibi) kaldırıldı — hiçbiri okunmuyordu ve
+     bileşenler rengi doğrudan Tailwind sınıfıyla (`bg-[#cdc1b5]`) yazıyor,
+     yani okunmayan bir ad yalnızca ikinci bir "gerçek kaynak" izlenimi
+     verirdi. Aynı gerekçeyle kullanılmayan `.surface-card` / `.btn-accent` /
+     `.badge-accent` kural setleri de kaldırıldı: elle yazılmış CSS'i Tailwind
+     budamaz, bu yüzden her biri pakete kalıcı olarak giriyordu.
      ========================================================================== */
 
   /* 60% DOMINANT: Ana sayfa tabanı, geniş tuval (#b9aba9) */
   --c60: #b9aba9;
-  --c60-rgb: 185, 171, 169;
 
   /* 30% SECONDARY: Kartlar, paneller, kenarlıklar, yan menü, üst çubuk (#cdc1b5) */
   --c30: #cdc1b5;
-  --c30-rgb: 205, 193, 181;
 
   /* 10% ACCENT: Butonlar, aktif sekmeler, vurgu hapları, etkileşimli elemanlar (#f9b88e) */
   --c10: #f9b88e;
-  --c10-rgb: 249, 184, 142;
-
-  /* Semantik Rol Eşlemeleri */
-  --bg-canvas: var(--c60);
-  --surface-card: var(--c30);
-  --accent-cta: var(--c10);
-
-  --dominant-bg: var(--c60);
-  --secondary-surface: var(--c30);
-  --accent-action: var(--c10);
 
   /* Kenarlıklar (Toprak ve taş paletiyle uyumlu, zarif) */
   --border-subtle: #a89997;
   --border-strong: #918280;
-  --border-focus: #f9b88e;
 
-  /* Yüksek Kontrastlı Okunabilir Tipografi (WCAG AAA uyumlu zengin espresso mürekkep) */
+  /*
+   * Okunabilir Tipografi (zengin espresso mürekkep) — ölçülen kontrast oranları:
+   *
+   *   --ink-primary  #231c1a  9.50:1 (yüzey) / 7.56:1 (tuval) → AAA
+   *   --ink-secondary #4a3e3b 5.82:1 (yüzey) / 4.63:1 (tuval) → AA
+   *   --ink-muted    #6e5f5c  3.44:1 (yüzey) / 2.74:1 (tuval) → AA'nın ALTINDA
+   *
+   * `--ink-muted` bu yüzden YALNIZCA grafik öğelerinde (ikon, SVG eksen çizgisi,
+   * grafik serisi) kullanılır: orada eşik 3:1'dir ve tuvale düşen bir ikon
+   * 2.74:1 ile bu eşiği de kıl payı kaçırdığı için ikonlar çoğunlukla yüzey
+   * rengi üzerinde durur. Metin (11-12px yardımcı metin dahil) hiçbir zaman
+   * `--ink-muted` ile yazılmaz; metin için `--ink-secondary` kullanılır.
+   */
   --ink-primary: #231c1a;
   --ink-secondary: #4a3e3b;
   --ink-muted: #6e5f5c;
@@ -58,50 +65,6 @@ body {
   padding: 0;
   overflow: hidden;
   letter-spacing: -0.01em;
-}
-
-/* 30% Kart ve Yüzeyler */
-.surface-card {
-  background-color: var(--c30);
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.75rem;
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.surface-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: 0 2px 8px rgba(35, 28, 26, 0.08);
-}
-
-/* 10% Vurgu Butonları */
-.btn-accent {
-  background-color: var(--c10);
-  color: var(--ink-primary);
-  font-weight: 700;
-  border: 1px solid rgba(35, 28, 26, 0.15);
-  border-radius: 0.5rem;
-  transition: all 0.15s ease;
-  box-shadow: 0 1px 3px rgba(35, 28, 26, 0.08);
-}
-
-.btn-accent:hover {
-  background-color: #f7a976;
-  border-color: var(--border-strong);
-  box-shadow: 0 2px 6px rgba(35, 28, 26, 0.12);
-}
-
-/* Sade Durum Rozetleri */
-.badge-accent {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  border: 1px solid rgba(35, 28, 26, 0.15);
-  background-color: var(--c10);
-  color: var(--ink-primary);
 }
 
 /* Özel İnce ve Uyumlu Kaydırma Çubuğu */

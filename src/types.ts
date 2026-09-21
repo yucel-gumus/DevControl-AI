@@ -31,32 +31,17 @@ export interface Repository {
   description: string;
   language: string;
   is_private: boolean;
-  private?: boolean;
   default_branch: string;
   stargazers_count: number;
   forks_count: number;
-  open_issues_count: number;
   updated_at: string;
   pushed_at: string;
   selected_for_analysis: boolean;
-  health_score?: number;
   risk_level?: 'HEALTHY' | 'NEEDS_ATTENTION' | 'AT_RISK' | 'CRITICAL';
   languages?: Record<string, number>;
   latest_ci_run?: RepositoryCiRun;
   latest_release?: RepositoryRelease;
   branches_count?: number;
-}
-
-export interface PunchCardItem {
-  day: number;
-  hour: number;
-  count: number;
-}
-
-export interface LanguageBreakdownItem {
-  name: string;
-  bytes: number;
-  percentage: number;
 }
 
 export type CommitCategory =
@@ -77,7 +62,6 @@ export interface CommitSemanticAnalysis {
 }
 
 export interface CommitMetric {
-  id?: string;
   sha: string;
   message: string;
   author: string;
@@ -109,10 +93,7 @@ export interface PullRequestMetric {
   merged_at?: string;
   additions: number;
   deletions: number;
-  changed_files: number;
   comments_count?: number;
-  review_comments_count?: number;
-  review_time_hours?: number;
   cycle_time_hours?: number;
   repo_name: string;
   is_stale?: boolean;
@@ -130,8 +111,6 @@ export interface IssueMetric {
   labels: string[];
   repo_name: string;
   is_stale?: boolean;
-  is_bug?: boolean;
-  resolution_time_hours?: number;
 }
 
 export interface FileHotspot {
@@ -139,10 +118,7 @@ export interface FileHotspot {
   repo_name: string;
   language: string;
   modifications_count: number;
-  commits_count: number;
   contributors_count: number;
-  lines_added: number;
-  lines_deleted: number;
   code_churn: number;
   avg_churn_per_commit?: number;
   bug_fix_commits_count: number;
@@ -181,6 +157,18 @@ export interface EngineeringHealthScore {
   hasData: boolean;
   dataStatus: 'ready' | 'partial' | 'no_data';
   dimensions: HealthScoreDimensions;
+  /**
+   * Motorun GERÇEKTEN hesapladığı boyutlar.
+   *
+   * `dimensions` sözlüğü her boyutun alanını taşır ama ölçülmemiş bir boyutun
+   * değeri de `0`'dır — sözlüğe bakan bir tüketici "ölçüldü, sıfır çıktı" ile
+   * "hiç ölçülmedi" durumunu ayırt edemez ve ölçülmemiş bir boyutu "0/100"
+   * diye gösterir. Bu alan ayrımı taşıyan tek kaynaktır: hangi boyutun
+   * ölçüldüğü kararı motorda tek yerde verilir (bkz.
+   * server/metrics/healthEngine.ts -> dimensionMeasured) ve ağırlıklı
+   * ortalama, notlar ile arayüz aynı kümeyi okur.
+   */
+  measuredDimensions: (keyof HealthScoreDimensions)[];
   weights: HealthScoreWeights;
   calculatedAt: string;
   breakdownNotes: {
@@ -232,6 +220,17 @@ export interface RepositoriesResponse {
   isCachedFromDb?: boolean;
 }
 
+/** /api/metrics/activity — günlük aktivite telemetrisi (yalnızca seçili depolar). */
+export interface ActivityTimeSeriesPoint {
+  date: string; // YYYY-MM-DD (UTC)
+  commits: number;
+  bugFixes: number;
+}
+
+export interface ActivityData {
+  timeSeries: ActivityTimeSeriesPoint[];
+}
+
 export interface RepoAiReview {
   repoName: string;
   architectureOverview: string;
@@ -248,9 +247,14 @@ export interface DeveloperPersona {
   summary: string;
   primaryLanguages: { name: string; percentage: number }[];
   productivityMetrics: {
+    /**
+     * Son `ACTIVITY_WINDOW_DAYS` günde ölçülen commit sayısı (pencerenin tek
+     * kaynağı server/constants.ts'tir; bu alan onunla aynı pencereyi anlatır).
+     */
     weeklyCommitFrequency: number;
+    /** Commit zaman damgalarından türetilen en yoğun çalışma penceresi. */
     dominantWorkingHours: string;
-    bugFixEfficiency: string;
+    /** Sınıflandırılmış commit oranı; ölçülemiyorsa bunu açıkça belirtir. */
     conventionalCommitHygiene: string;
   };
   superpowers: string[];
@@ -275,7 +279,13 @@ export interface EngineeringRisk {
   category: 'CODE_HOTSPOT' | 'DELIVERY_BOTTLENECK' | 'TECHNICAL_DEBT' | 'DOCUMENTATION_GAP' | 'MAINTENANCE_STALENESS' | 'QUALITY_REGRESSION' | 'CI_FAILURE';
   affectedRepository: string;
   repo_name?: string;
-  affectedFiles?: string[];
+  /**
+   * Riskin ölçüm kapsamı. `'portfolio'` → risk tüm analiz kapsamı (seçili
+   * depoların toplamı) üzerinden ölçülür ve TEK bir depoya atfedilemez; bu
+   * durumda `affectedRepository` ve `repo_name` boştur. Alanın bulunmaması
+   * `'repository'` anlamına gelir (depoya bağlı riskler için alan yazılmaz).
+   */
+  scope?: 'repository' | 'portfolio';
   summary: string;
   evidence: {
     metric: string;
@@ -289,24 +299,6 @@ export interface EngineeringRisk {
   status: 'OPEN' | 'INVESTIGATING' | 'RESOLVED';
 }
 
-export interface AIInsight {
-  id: string;
-  title: string;
-  summary: string;
-  priority: 'HIGH' | 'MEDIUM' | 'LOW' | 'OPPORTUNITY';
-  category: 'ARCHITECTURE' | 'PRODUCTIVITY' | 'HOTSPOT' | 'PROCESS' | 'SKILLS';
-  targetRepo?: string;
-  facts: string[];
-  aiInterpretation: string;
-  confidence: number;
-  evidence: {
-    metric: string;
-    value: string | number;
-    source: string;
-  }[];
-  recommendedAction: string;
-  createdAt: string;
-}
 
 export interface TodayBriefItem {
   id: string;
@@ -323,6 +315,15 @@ export interface AnalysisTraceStep {
   status: 'pending' | 'running' | 'completed' | 'failed';
   details?: string;
   durationMs?: number;
+  /**
+   * Adımın yürüttüğü araç (varsa).
+   *
+   * `step` kullanıcıya gösterilen cümledir ve serbestçe değişebilir; arayüzün
+   * "hangi araç ne durumda" eşlemesini metne göre yapması, cümle değiştiğinde
+   * sessizce bozulur ve başarısız bir çağrı "tamamlandı" diye görünürdü. Bu
+   * yüzden araç bağı ayrı ve makine tarafından okunur bir alandır.
+   */
+  tool?: string;
 }
 
 export interface AnalysisTrace {
@@ -342,7 +343,6 @@ export interface AskAiMessage {
   content: string;
   timestamp: string;
   trace?: AnalysisTrace;
-  toolInvocations?: { toolName: string }[];
   evidence?: {
     metric: string;
     value: string | number;
@@ -353,20 +353,4 @@ export interface AskAiMessage {
   recommendedActions?: string[];
 }
 
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  inputSchema: Record<string, any>;
-  outputSchema: Record<string, any>;
-}
 
-export interface AnalysisSnapshot {
-  id: string;
-  name: string;
-  timestamp: string;
-  repositoriesCount: number;
-  healthScore: number;
-  risksCount: number;
-  hotspotsCount: number;
-  commitsAnalyzed: number;
-}

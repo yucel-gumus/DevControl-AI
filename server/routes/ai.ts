@@ -1,47 +1,147 @@
 import { Router } from 'express';
-import { GitHubService } from '../github/githubService.js';
+import { GitHubService, GitHubStoreState } from '../github/githubService.js';
 import { InsightsEngine } from '../ai/insightsEngine.js';
 import { AgentPlanner } from '../ai/agentPlanner.js';
 import { HotspotEngine } from '../metrics/hotspotEngine.js';
-import { GEMINI_MODEL_CHAIN } from '../gemini.js';
 import { FirestoreService } from '../db/firestoreService.js';
 import { asyncHandler } from './asyncHandler.js';
+import { respondIfSyncFailed } from './syncGuard.js';
+import { CommitMetric, Repository } from '../../src/types.js';
 
 const router = Router();
 
-router.get('/status', (_req, res) => {
-  const hasKey = Boolean(process.env.GEMINI_API_KEY);
-  res.json({
-    configured: hasKey,
-    model: GEMINI_MODEL_CHAIN[0],
-    service: 'Google GenAI SDK (Çoklu Model Zinciri)',
-  });
-});
+/**
+ * Aynı imza için UÇUŞTAKİ türev üretimi (tek uçuş).
+ *
+ * Brifing ve persona faturalanan yapay zeka zincirleridir; önbellek boşken iki
+ * sekme (ya da iki istemci) aynı anda isterse ikisi de aynı telemetri için ayrı
+ * bir üretim başlatır ve maliyet ikiye katlanır. Anahtar, çıktının hangi
+ * telemetriye ait olduğunu taşır (bkz. telemetryContextSignature): farklı bir
+ * imza için bekleyen bir üretim PAYLAŞILMAZ — paylaşılsaydı çağıran, kendi
+ * telemetrisine ait olmayan bir yanıt alırdı.
+ */
+const inFlightDerivations = new Map<string, Promise<unknown>>();
 
-router.get('/brief', asyncHandler(async (_req, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext();
-  if (ctx.state.syncStatus === 'error') {
-    return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
+function singleFlight<T>(key: string, produce: () => Promise<T>): Promise<T> {
+  const existing = inFlightDerivations.get(key);
+  if (existing) return existing as Promise<T>;
+  const promise = produce().finally(() => {
+    // Yalnızca kendi girdisi temizlenir: aynı anahtar için yeni bir üretim
+    // başlamışsa onun sözü haritada kalmalıdır.
+    if (inFlightDerivations.get(key) === promise) {
+      inFlightDerivations.delete(key);
+    }
+  });
+  inFlightDerivations.set(key, promise);
+  return promise;
+}
+
+/**
+ * Telemetriye bağlı bir türevi üretir: aynı imza için uçuşta olan üretimle
+ * paylaşır (bkz. singleFlight) ve sonucu YALNIZCA imza değişmediyse önbelleğe
+ * yazar.
+ *
+ * İki adım tek yerde durur çünkü ikisi aynı değişmezi korur: çağıran, kendi
+ * telemetrisine ait olmayan bir yanıt almamalı ve önbellekteki kayıt da servis
+ * edilen telemetriye ait olmalıdır. Üretim sürerken eşitleme tamamlanırsa imza
+ * değişir; o an yazılan kayıt bayat telemetriyi "güncel" diye servis ederdi.
+ * İki çağrı yerine kopyalanan bu karşılaştırma, yalnızca birinde düzeltilen bir
+ * hatayı diğerinde bırakırdı.
+ */
+async function deriveForTelemetry<T>(
+  keyPrefix: string,
+  signature: string | null,
+  produce: () => Promise<T>,
+  store: (generated: T) => void,
+): Promise<T> {
+  return singleFlight(`${keyPrefix}:${signature}`, async () => {
+    const generated = await produce();
+    if (GitHubService.getTelemetrySignature() === signature) {
+      store(generated);
+    }
+    return generated;
+  });
+}
+
+/**
+ * İstenen depoyu ve o deponun commit telemetrisini çözer.
+ *
+ * Depo analiz kapsamında değilse (henüz seçilmemişse) commit'i yoktur; bu
+ * durumda depo analize dahil edilip telemetri yeniden okunur. Depo hiç
+ * yoksa `null` döner ve çağıran katman 404 üretir — olmayan bir depo için
+ * yapay zeka incelemesi/önerisi üretilmez.
+ */
+async function resolveRepoCommits(
+  state: GitHubStoreState,
+  repoName: string,
+): Promise<{ targetRepo: Repository; commits: CommitMetric[] } | null> {
+  const targetRepo = state.repositories.find(
+    (repo) => repo.name.toLowerCase() === repoName.toLowerCase(),
+  );
+  if (!targetRepo) return null;
+
+  const commitsOf = (source: GitHubStoreState) =>
+    source.commits.filter((commit) => commit.repo_name.toLowerCase() === repoName.toLowerCase());
+
+  let commits = commitsOf(state);
+  if (commits.length === 0 && !targetRepo.selected_for_analysis) {
+    try {
+      await GitHubService.toggleRepoSelection(targetRepo.id);
+      commits = commitsOf(GitHubService.getState());
+    } catch {
+      // Seçim değiştirilemezse mevcut (boş) telemetriyle devam edilir; çağıran
+      // katman ölçümsüz durumu kendi 404/503 yanıtıyla açıkça bildirir.
+    }
   }
 
-  // Hızlı Yol: Firestore snapshot'ından gelen önbellek varsa doğrudan dön (Anında Başlatma)
+  return { targetRepo, commits };
+}
+
+router.get('/brief', asyncHandler(async (_req, res) => {
+  // Uçuştaki eşitlemeyi beklemez (bkz. getActiveTelemetryContext): brifing
+  // yüklü telemetriden üretilir, eşitleme bitince önbellek zaten düşürülür.
+  const ctx = await GitHubService.getActiveTelemetryContext({ waitForSync: false });
+  if (respondIfSyncFailed(res, ctx.state)) return;
+
+  // Hızlı Yol: üretilmiş brifing önbellekte varsa doğrudan dön. Önbellek iki
+  // kaynaktan dolar: Firestore snapshot'ı (soğuk başlangıçta anında yanıt) ve
+  // canlı telemetriden üretilen son brifing. Canlı bir eşitleme tamamlandığında
+  // önbellek düşürülür (bkz. GitHubService: eşitleme sonunda türev yapay zeka
+  // çıktıları geçersiz kılınır), yani burada servis edilen değer ya güncel
+  // telemetriden gelir ya da henüz canlı eşitleme yapılmamış bir snapshot'tır.
+  // Eskiden `isCachedFromDb` koşulu vardı: canlı modda önbellek yok sayılıp
+  // brifing her istekte yeniden üretiliyordu; React Query'nin her yeniden
+  // getirmesi böylece yeni bir Gemini çağrı zinciri faturalandırıyordu.
   const cachedBrief = GitHubService.getCachedDailyBrief();
-  if (cachedBrief && cachedBrief.length > 0 && ctx.state.isCachedFromDb) {
+  if (cachedBrief && cachedBrief.length > 0) {
     return res.json(cachedBrief);
   }
 
-  const brief = await InsightsEngine.generateDailyBrief(ctx.activeRepos, ctx.hotspots, ctx.risks, ctx.health);
-  GitHubService.setCachedDailyBrief(brief);
-  res.json(brief);
-}));
+  // Üretim saniyeler sürebilir; bu sırada telemetri değişirse (uçuştaki bir
+  // eşitleme tamamlanır ya da seçim değişir) üretilen brifing artık servis
+  // edilen telemetriye ait değildir. İmza karşılaştırması bu yüzden yapılır:
+  // aksi hâlde eşitlemenin az önce temizlediği önbellek bayat içerikle geri
+  // dolar ve hızlı yol onu bir sonraki eşitlemeye kadar servis ederdi.
+  const telemetrySignature = GitHubService.getTelemetrySignature();
 
-router.get('/insights', asyncHandler(async (_req, res) => {
-  const ctx = await GitHubService.getActiveTelemetryContext();
-  if (ctx.state.syncStatus === 'error') {
-    return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
-  }
-  const insights = await InsightsEngine.generateInsights(ctx.activeRepos, ctx.commits, ctx.pullRequests, ctx.issues, ctx.hotspots, ctx.risks, ctx.health);
-  res.json(insights);
+  // "En istikrarlı depo" gibi karşılaştırmalı ifadeler yalnızca gerçekten
+  // commit telemetrisi bulunan depolar üzerinden kurulmalıdır.
+  const reposWithTelemetry = new Set(ctx.commits.map((c) => c.repo_name.toLowerCase()));
+  // Üretim aynı imza için uçuşta olan bir istekle paylaşılır (bkz. singleFlight):
+  // ikinci sekme, birincinin (faturalanan) sonucunu bekler.
+  const brief = await deriveForTelemetry(
+    'brief',
+    telemetrySignature,
+    () => InsightsEngine.generateDailyBrief(
+      ctx.activeRepos,
+      ctx.hotspots,
+      ctx.risks,
+      ctx.health,
+      reposWithTelemetry,
+    ),
+    (generated) => GitHubService.setCachedDailyBrief(generated),
+  );
+  res.json(brief);
 }));
 
 router.post('/ask', asyncHandler(async (req, res) => {
@@ -51,10 +151,11 @@ router.post('/ask', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'İstek gövdesinde soru veya sorgu parametresi zorunludur.' });
   }
 
-  const ctx = await GitHubService.getActiveTelemetryContext();
-  if (ctx.state.syncStatus === 'error') {
-    return res.status(502).json({ error: ctx.state.syncError || 'GitHub verileri eşitlenemedi.' });
-  }
+  // Uçuştaki eşitlemeyi beklemez (bkz. getActiveTelemetryContext): soru yüklü
+  // telemetriye göre yanıtlanır; eşitlemeyi beklemek istemci zaman aşımına
+  // düşüp üretilen (faturalanan) yanıtı çöpe atardı.
+  const ctx = await GitHubService.getActiveTelemetryContext({ waitForSync: false });
+  if (respondIfSyncFailed(res, ctx.state)) return;
 
   try {
     const result = await AgentPlanner.answerQuestion(question, {
@@ -67,15 +168,11 @@ router.post('/ask', asyncHandler(async (req, res) => {
       healthScore: ctx.health,
     });
 
-    res.json({
-      ...result,
-      response: result.message?.content || '',
-      content: result.message?.content || '',
-      facts: result.message?.facts || [],
-      interpretation: result.message?.interpretation || '',
-      evidence: result.message?.evidence || [],
-      recommendedActions: result.message?.recommendedActions || [],
-    });
+    // Yanıt tek sözleşmeyle döner: `AgentExecutionResult` (message + trace).
+    // Alanları ayrıca düzleştirilmiş kopyalar olarak eklemek, aynı içeriği iki
+    // şekilde taşır ve yeni bir alanın iki yerde tanımlanmasını gerektirirdi;
+    // istemci de iki şekli birden savunmak zorunda kalırdı.
+    res.json(result);
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Yapay zeka mühendislik sorgusu işlenirken hata oluştu.';
     res.status(500).json({ error: errorMsg });
@@ -83,30 +180,38 @@ router.post('/ask', asyncHandler(async (req, res) => {
 }));
 
 router.get('/developer-persona', asyncHandler(async (_req, res) => {
-  const state = await GitHubService.ensureSynced();
-  if (state.syncStatus === 'error') {
-    return res.status(502).json({ error: state.syncError || 'GitHub verileri eşitlenemedi.' });
-  }
+  // Diğer analiz uçlarıyla aynı kaynak: analiz kapsamı (seçili depolar) ve ona
+  // ait telemetri. Böylece persona, aynı ekranda yanında duran KPI kartlarıyla
+  // aynı kapsamı ölçer; kullanıcı iki farklı sayı görmez. Uçuştaki eşitlemeyi
+  // beklemez (bkz. getActiveTelemetryContext).
+  const ctx = await GitHubService.getActiveTelemetryContext({ waitForSync: false });
+  const state = ctx.state;
+  if (respondIfSyncFailed(res, state)) return;
 
-  // Hızlı Yol: Firestore snapshot'ından gelen persona varsa doğrudan dön
+  // Hızlı Yol: üretilmiş persona önbellekte varsa doğrudan dön (gerekçe için
+  // bkz. /brief: önbellek canlı eşitlemede düşürülür, bu yüzden burada servis
+  // edilen değer güncel telemetriye aittir).
   const cachedPersona = GitHubService.getCachedDeveloperPersona();
-  if (cachedPersona && state.isCachedFromDb) {
+  if (cachedPersona) {
     return res.json(cachedPersona);
   }
 
-  const activeRepos = state.repositories.filter((r) => r.selected_for_analysis);
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const recentCommits = state.commits.filter((c) => {
-    const t = new Date(c.date).getTime();
-    return Number.isFinite(t) && t >= sevenDaysAgo;
-  });
-  const commitsToAnalyze = recentCommits.length > 0 ? recentCommits : state.commits;
-  const persona = await InsightsEngine.generateDeveloperPersona(
-    state.user,
-    activeRepos.length > 0 ? activeRepos : state.repositories,
-    commitsToAnalyze
+  // Son 7 gün penceresi burada tekrar filtrelenmez: `generateDeveloperPersona`
+  // haftalık commit sayısını zaten kendi içinde aynı ölçütle hesaplar. İki ayrı
+  // filtre, iki farklı "haftalık commit" tanımı üretme riski taşır.
+  const telemetrySignature = GitHubService.getTelemetrySignature();
+  // Üretim aynı imza için uçuşta olan bir istekle paylaşılır ve sonuç yalnızca
+  // telemetri imzası değişmediyse önbelleğe yazılır (bkz. deriveForTelemetry).
+  const persona = await deriveForTelemetry(
+    'persona',
+    telemetrySignature,
+    () => InsightsEngine.generateDeveloperPersona(
+      state.user,
+      ctx.activeRepos,
+      ctx.commits,
+    ),
+    (generated) => GitHubService.setCachedDeveloperPersona(generated),
   );
-  GitHubService.setCachedDeveloperPersona(persona);
   res.json(persona);
 }));
 
@@ -116,37 +221,71 @@ router.post('/repo-review', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'repoName alanı zorunludur.' });
   }
 
-  // Önce Firestore'da önbelleğe alınmış hazır inceleme var mı kontrol et
-  const cachedReview = await FirestoreService.getRepoReview(repoName);
-  if (cachedReview && !req.body?.force) {
-    return res.json(cachedReview);
+  // Hızlı Yol: önbellekte taze bir inceleme varsa senkronizasyonu hiç çalıştırma.
+  // `ensureSynced()` gerekirse tüm GitHub telemetrisini yeniden çeker; önbellek
+  // isabetinde bu maliyeti ödemek gereksizdir. Önbellek kaydı yalnızca bu
+  // depo adı için gerçekten üretilmişse döner (bkz. FirestoreService.getRepoReview).
+  //
+  // `force` bu yolu atlar ve raporu güncel telemetriden yeniden üretir: arayüz
+  // bunu "Yeniden Üret" düğmesiyle gönderir. Aksi halde 7 günlük TTL boyunca
+  // önbellekteki rapor servis edilir ve mimarisi değişmiş bir depo için tek
+  // çıkış yolu kalmazdı (yanıtın `reviewedAt` alanı, raporun yaşını bildirir).
+  //
+  // Değer KATI boolean olarak okunur (`=== true`): truthy bir değer ("false"
+  // dizgisi, 1) önbelleği atlar ve her çağrıda faturalanan yeni bir üretim
+  // başlatır; üretim sonunda `saveRepoReview` önbelleği tazelediği için TTL
+  // koruması hiç devreye girmez ve `REVIEW_TTL_MS`'in amacı boşa çıkar. Arayüz
+  // `Boolean(force)` gönderir; ama sözleşme çağıranın doğru yazmasına
+  // bırakılamaz (aynı gövdeyi gönderen bir betik ya da istemci hatası).
+  const forceRegenerate = req.body?.force === true;
+  if (!forceRegenerate) {
+    const cachedReview = await FirestoreService.getRepoReview(repoName);
+    if (cachedReview) {
+      return res.json(cachedReview);
+    }
   }
 
   const state = await GitHubService.ensureSynced();
-  const targetRepo = state.repositories.find(r => r.name.toLowerCase() === repoName.toLowerCase());
-  if (!targetRepo) {
+  if (respondIfSyncFailed(res, state)) return;
+
+  // Önbellek ıskası: depo adı yine de doğrulanır, böylece olmayan bir depo için
+  // yapay zeka incelemesi üretilmez (404).
+  const resolved = await resolveRepoCommits(state, repoName);
+  if (!resolved) {
     return res.status(404).json({ error: `${repoName} deposu bulunamadı.` });
   }
-
-  let commits = state.commits.filter(c => c.repo_name.toLowerCase() === repoName.toLowerCase());
-  if (commits.length === 0 && !targetRepo.selected_for_analysis) {
-    try {
-      await GitHubService.toggleRepoSelection(targetRepo.id);
-      const updatedState = GitHubService.getState();
-      commits = updatedState.commits.filter(c => c.repo_name.toLowerCase() === repoName.toLowerCase());
-    } catch {
-      // Toggle başarısız olursa mevcut state ile devam et
-    }
-  }
+  const { targetRepo, commits } = resolved;
 
   const hotspots = HotspotEngine.analyzeHotspots(commits);
   const [owner, repoShortName] = (targetRepo.full_name && targetRepo.full_name.includes('/'))
     ? targetRepo.full_name.split('/')
     : [state.user.login, targetRepo.name];
   const fileTree = await GitHubService.fetchRepositoryTree(owner, repoShortName, targetRepo.default_branch);
-  const review = await InsightsEngine.reviewRepository(targetRepo, commits, hotspots, fileTree);
 
-  // Firestore'a kaydet (Upsert)
+  // ÖLÇÜMSÜZ İNCELEME ÜRETİLMEZ. Depo için ne analiz penceresinde commit
+  // kaydı ne de dosya ağacı alınabildiyse (ağaç isteği başarısız olduğunda ya
+  // da jeton yokken `fetchRepositoryTree` boş liste döner) modelin elinde
+  // yalnızca depo üst verisi kalır; üretilen kalite skoru hiçbir telemetriye
+  // dayanmaz ve 7 gün boyunca gerçek bir inceleme gibi servis edilirdi.
+  // Kardeş uç (`/hotspot-refactor`) aynı ölçümsüz durumu 404 ile bildirir.
+  if (commits.length === 0 && fileTree.length === 0) {
+    return res.status(404).json({
+      error: `${repoName} deposu için analiz penceresinde doğrulanmış commit veya dosya ağacı kaydı bulunmuyor; inceleme ölçümsüz veriyle üretilmez.`,
+    });
+  }
+
+  const review = await InsightsEngine.reviewRepository(targetRepo, commits, hotspots, fileTree);
+  if (!review) {
+    // Yapay zeka katmanı geçerli bir inceleme üretemedi. Burada şablon bir
+    // rapor döndürüp önbelleğe YAZMAK, sonraki 7 gün boyunca gerçek bir
+    // inceleme gibi sunulacak uydurma veri oluştururdu; bunun yerine durum
+    // açıkça bildirilir.
+    return res.status(503).json({
+      error: 'Yapay zeka incelemesi şu anda üretilemedi. Yapay zeka katmanının (GEMINI_API_KEY) yapılandırıldığından emin olun ve birkaç dakika sonra yeniden deneyin.',
+    });
+  }
+
+  // Yalnızca gerçek yapay zeka incelemesi kalıcılaştırılır (Upsert).
   await FirestoreService.saveRepoReview(repoName, review);
 
   res.json(review);
@@ -154,67 +293,44 @@ router.post('/repo-review', asyncHandler(async (req, res) => {
 
 router.post('/hotspot-refactor', asyncHandler(async (req, res) => {
   const { filePath, repoName } = req.body || {};
-  if (!filePath || !repoName) {
+  if (typeof filePath !== 'string' || !filePath || typeof repoName !== 'string' || !repoName) {
     return res.status(400).json({ error: 'filePath ve repoName alanları zorunludur.' });
   }
+
   const state = await GitHubService.ensureSynced();
-  let commits = state.commits.filter(c => c.repo_name.toLowerCase() === String(repoName).toLowerCase());
+  // Eşitleme hatasında analiz, boş telemetriyle yürütülür ve dosya için
+  // ölçümsüz bir kayıt üretilirdi; diğer analiz uçlarıyla aynı kapı burada da
+  // uygulanır (bkz. /ask, /brief, /developer-persona, /repo-review).
+  if (respondIfSyncFailed(res, state)) return;
 
-  if (commits.length === 0) {
-    const targetRepo = state.repositories.find(r => r.name.toLowerCase() === String(repoName).toLowerCase());
-    if (targetRepo && !targetRepo.selected_for_analysis) {
-      try {
-        await GitHubService.toggleRepoSelection(targetRepo.id);
-        const updatedState = GitHubService.getState();
-        commits = updatedState.commits.filter(c => c.repo_name.toLowerCase() === String(repoName).toLowerCase());
-      } catch {
-        // Toggle başarısız olursa mevcut state ile devam et
-      }
-    }
+  const resolved = await resolveRepoCommits(state, repoName);
+  if (!resolved) {
+    return res.status(404).json({ error: `${repoName} deposu bulunamadı.` });
   }
 
-  const hotspots = HotspotEngine.analyzeHotspots(commits);
-  let targetHotspot = hotspots.find(
-    (h) => h.path === filePath && h.repo_name.toLowerCase() === String(repoName).toLowerCase()
+  // Dosyanın risk seviyesi, güveni, kanıtı ve önerisi hotspot motorunun kritik
+  // listeyle AYNI türetiminden gelir. Burada ayrı bir formülle kayıt üretmek,
+  // aynı dosyayı listede ve detayda çelişkili metriklerle gösterme riski taşır.
+  const targetHotspot = HotspotEngine.analyzeFileHotspot(
+    resolved.commits,
+    resolved.targetRepo.name,
+    filePath,
   );
-
   if (!targetHotspot) {
-    // Depo commitlerinden dosyanın gerçek metriklerini dinamik olarak hesapla
-    const fileCommits = commits.filter((c) => (c.affected_files || []).includes(filePath));
-    const authors = new Set(fileCommits.map((c) => c.author));
-    let linesAdded = 0;
-    let linesDeleted = 0;
-    let bugFixes = 0;
-
-    for (const c of fileCommits) {
-      if (c.is_bug_fix) bugFixes += 1;
-      const fMatch = (c.files || []).find((f) => (f.filename || f.path) === filePath);
-      if (fMatch) {
-        linesAdded += fMatch.additions || 0;
-        linesDeleted += fMatch.deletions || 0;
-      }
-    }
-    const churn = linesAdded + linesDeleted;
-
-    targetHotspot = {
-      path: filePath,
-      repo_name: repoName,
-      language: filePath.split('.').pop() || 'Kod',
-      modifications_count: fileCommits.length,
-      commits_count: fileCommits.length,
-      contributors_count: authors.size || 1,
-      lines_added: linesAdded,
-      lines_deleted: linesDeleted,
-      code_churn: churn,
-      bug_fix_commits_count: bugFixes,
-      risk_level: fileCommits.length >= 6 ? 'HIGH' : fileCommits.length >= 3 ? 'MEDIUM' : 'LOW',
-      confidence: fileCommits.length > 0 ? 85 : 70,
-      last_modified: fileCommits[0]?.date || new Date().toISOString(),
-      evidence: [],
-      recommendation: 'Tek Sorumluluk Prensibi (SRP) doğrultusunda modüler bileşenlere ayrıştırın.',
-    };
+    return res.status(404).json({
+      error: `${repoName} deposunda ${filePath} dosyasına ait analiz penceresinde doğrulanmış commit kaydı bulunmuyor.`,
+    });
   }
-  const refactor = await InsightsEngine.suggestHotspotRefactoring(targetHotspot, commits);
+
+  const refactor = await InsightsEngine.suggestHotspotRefactoring(targetHotspot, resolved.commits);
+  if (!refactor) {
+    // Şablon bir "teşhis" veya uydurma bir kazanım yüzdesi döndürmek yerine
+    // durum açıkça bildirilir (bkz. InsightsEngine.suggestHotspotRefactoring).
+    return res.status(503).json({
+      error: 'Yapay zeka yeniden yapılandırma önerisi şu anda üretilemedi. Lütfen birkaç dakika sonra yeniden deneyin.',
+    });
+  }
+
   res.json(refactor);
 }));
 
