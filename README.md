@@ -39,6 +39,7 @@ Bu proje **[Yücel Gümüş](https://yucelgumus.dev/)** tarafından sıfırdan t
   - **Teslimat Ritmi (Delivery)**: Kişisel commit frekansı ve PR yaşam döngüsü hızı.
   - **Kritik Dosyalar Radarı (Hotspots)**: En çok hata alan ve sık değişen kritik kaynak kod dosyalarını tespit eder.
   - **Mühendislik Riskleri (Risks)**: Durgun PR'lar, yüksek oynaklıktaki dosyalar ve dokümantasyon borçları.
+- **Ölçüm Dürüstlüğü**: Ölçülemeyen bir boyut hiçbir yüzeyde (arayüz, günlük bülten, ajan olgu satırı) "0/100" gibi ölçülmüş bir değerle gösterilmez; hangi boyutların gerçekten ölçüldüğü `measuredDimensions` alanında işaretlenir ve tüm yüzeyler bu tek kaynağı okur. Kural iki yönlüdür: ölçülmemiş değer ölçülmüş sayılamaz, ölçülmüş değer de "--" diye saklanamaz.
 
 ### 3. 🤖 Google Gemini Yapay Zeka Entegrasyonu
 - **Geliştirici Personası (Developer Persona)**: Son 7 günlük commit telemetriniz ve dilleriniz üzerinden teknik unvanınızı, süper güçlerinizi ve gelişim alanlarınızı sentezler.
@@ -105,9 +106,23 @@ GITHUB_TOKEN="ghp_..."
 
 # TypeSafe AI System One (Jev) — opsiyonel karar katmanı
 TYPESAFE_API_KEY="ts_..."
+
+# Firestore kalıcılığı: proje ID'si Cloud Run'da otomatik sağlanır
+# (GOOGLE_CLOUD_PROJECT / GCP_PROJECT sırayla okunur); veritabanı adı boş
+# bırakılırsa "(default)" kullanılır
+FIREBASE_PROJECT_ID=""
+FIRESTORE_DATABASE_ID=""
+
+# Sunucu portu (Cloud Run portu kendisi atar)
+PORT="3000"
+
+# Ters vekil (proxy) zincirindeki güvenilen atlama sayısı — aşağıdaki nota bakın
+TRUST_PROXY_HOPS="2"
 ```
 
 > **Önemli Güvenlik Notu**: `.env` dosyası `.gitignore` ve `.dockerignore` ile korunmaktadır. API anahtarlarınız, TypeSafe anahtarınız ve GitHub tokenınız asla istemciye veya git reposuna sızdırılmaz. `TYPESAFE_API_KEY` de dahil tüm gizli anahtarlar yalnızca sunucu tarafında `process.env` üzerinden okunur; istemci paketine gömülmez.
+
+> **`TRUST_PROXY_HOPS` uyarısı**: Sunucu, istemci IP'sini `X-Forwarded-For` zincirinin sağdan kaçıncı halkasından okuyacağını bu değerden belirler. Değer gerçek proxy sayısından **büyük** olursa `req.ip` istemcinin kendi yazdığı adrese düşer ve hız sınırı (rate limit) atlatılabilir. Firebase Hosting → Cloud Run yolunda varsayılan `2` doğrudur; Cloud Run adresine doğrudan erişiliyorsa `1` verin (bu durumda Hosting yolunda tüm ziyaretçiler tek sayaçta toplanır). Geçersiz bir değer sessizce yok sayılmaz: sunucu başlangıçta uyarı basar ve `2` varsayımına döner. Geliştirmeye özel kalan anahtarlar (`DISABLE_HMR` gibi) açıklamalarıyla birlikte `.env.example` içinde listelenir.
 
 ### 3.1. Opsiyonel: API Erişim Kapısı
 `DEVCONTROL_API_TOKEN` tanımlarsanız `/api/health` dışındaki tüm `/api/*` uç noktaları bir jeton ister (`Authorization: Bearer <jeton>` veya `X-Api-Token: <jeton>`, sabit zamanlı karşılaştırma ile). Sağlık ucu jeton istemez: dış izleme (uptime / readiness) probları jeton taşımaz ve kapı açıkken 401 alsalardı sağlıklı bir sürüm sağlıksız sayılırdı. Tarayıcıdan kullanmak için jetonu bir kez localStorage'a yazın:
