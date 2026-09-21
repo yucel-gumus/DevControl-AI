@@ -49,9 +49,21 @@ Bu proje **[Yücel Gümüş](https://yucelgumus.dev/)** tarafından sıfırdan t
 - **Çoklu Model Yedekleme Zinciri (Fallback Chain)**: `gemini-3.8-flash` -> `gemini-3.7-flash` -> `gemini-3.6-flash` -> `gemini-3.5-flash` -> `gemini-3.5-flash-lite`. Zincir en yetenekli modelden başlar; geçici hatalarda (429 / 503 / zaman aşımı) üstel geri çekilme ile sıradaki modele düşer.
 
 ### 4. 🎯 TypeSafe AI System One (Jev) Karar Katmanı
-`TYPESAFE_API_KEY` tanımlıysa ajan planlayıcısı, LLM sentezinden **önce** ve **sonra** iki deterministik karar adımı çalıştırır:
-- **Niyet Yönlendirmesi (Intent Routing)**: Kullanıcı sorgusunu ve depo bağlamını `state` olarak gönderir; tek bir System One çağrısında `choice` (hangi araçlar çalıştırılmalı), `noul` (sorgu doğrudan bir metrikle yanıtlanabilir mi) ve `score` (aciliyet) sorularını yanıtlar. Araç seçimini belirleyen `choice` ve istemi biçimlendiren `score` yanıtları güveni `0.45`in altındaysa yok sayılır; `noul` yanıtı güven alanı taşımadığı için kendi değer eşiğiyle (`noul < 0.7`) süzülür.
-- **Kanıt Doğrulaması (Fact-Check)**: Gemini sentezinden sonra üretilen yanıt, çalıştırılan araçların gerçek çıktılarıyla karşılaştırılır. `noul` değeri 0.5'in altındaysa yanıtın sonuna kullanıcıya görünen bir **Kanıt Doğrulama Uyarısı** eklenir.
+
+**Ne amaçla:** Modelin "ne derse" mantığını, telemetrinin "ne gösterdiği" ile hizalamak. İki deterministik kapı, LLM sentezinin **öncesinde** araç seçimini yönlendirir, **sonrasında** üretilen metnin ölçülen kanıtlarla uyumunu denetler.
+
+**Nerede:** Yalnızca **KENSAI Ask AI** akışı (`POST /api/ai/ask` → `server/ai/agentPlanner.ts`; HTTP çağrısını yapan modül `server/typesafe.ts`). Diğer yapay zeka özellikleri (günlük bülten, geliştirici personası, depo incelemesi, refactoring planı) bu katmandan geçmez; Gemini'yi doğrudan kullanır.
+
+`TYPESAFE_API_KEY` tanımlıysa ajan planlayıcısı iki adımı çalıştırır:
+
+- **Niyet Yönlendirmesi (Intent Routing — sentezden önce)**: Sorguyu ve depo bağlamını (`hedefDepo`, `izlenenDepolar`) `state` olarak gönderir; tek bir System One çağrısında üç soruyu yanıtlar: `choice` "hangi analiz alanı?" (araç planını seçer), `noul` "sorgu doğrudan bir metrikle yanıtlanabilir mi?", `score` "aciliyet seviyesi?" (3 seviyeli ölçek). Güveni `0.45`in altındaki `choice`/`score` yanıtları yok sayılır; `noul` güven alanı taşımadığı için kendi değer eşiğiyle (`noul < 0.7`) süzülür. Tanınan niyet adları (`hotspots`, `risks`, `commits`, `pull_requests`, `health`) tablodaki araç kümesine eşlenir; tanınmayan ada veya düşük güvene düşülürse araç seçimi deterministik varsayılan plana kalır. Eşiği geçen sinyaller istemi de biçimlendirir: "doğrudan metrik" yanıtı kısa/net yapıyı, en üst seviye aciliyet ise yanıtın en kritik bulguyla başlamasını tetikler.
+- **Kanıt Doğrulaması (Fact-Check — sentezden sonra)**: Gemini'nin ürettiği yanıt, çalıştırılan araçların gerçek çıktılarıyla karşılaştırılır. Kapı **yalnızca yapay zekanın ürettiği metni** denetler: yanıt deterministik telemetri özetiyse (Gemini erişilemedi) doğrulama çağrısı hiç yapılmaz. `noul` değeri `0.5`in altındaysa yanıtın sonuna kullanıcıya görünen bir **Kanıt Doğrulama Uyarısı** eklenir; eşiği geçen yanıt uyarısız kalır. Her iki adımın sonucu (çağrılan model, güven/skor, süre) arayüzdeki **analiz izine** adım olarak yazılır.
+
+**Nasıl çalışır:**
+- **Çağrı sözleşmesi**: `POST https://api.typesafe.ai/v1/systemone`, model `jev-latest`, `Authorization: Bearer <anahtar>`. Gövde `{ state, model, questions }`; her soru `choice` (kriter listesinden seçim + güven), `noul` (0..1 olasılık) veya `score` (seviye ekseninde konum) tipindedir.
+- **Yanıt doğrulaması cevap bazındadır**: Şemaya uymayan tek bir cevap yalnızca kendisi düşer, geçerli cevaplar kullanılmaya devam eder; hiç geçerli cevap yoksa çağrı `null` döner ve katman sessizce devre dışı kalır — ölçümsüz bir sonuç ölçülmüş gibi gösterilmez.
+- **Kanıt adımına gönderilen girdi**: kanıt satırlarının tamamı, sentezleyicinin gördüğü ölçüm projeksiyonunun aynısı ve cevabın ilk 4000 karakteri (veri akışının tam listesi **🔒 Gizlilik ve Güvenlik** bölümünde).
+- **Dayanıklılık**: `429`, `5xx` ve `529` geçici sayılıp sınırlı üstel geri çekilmeyle yeniden denenir; toplam süre bütçesi aşılırsa çağrı kesilir. Niyet adımı gecikmeye duyarlıdır (5 sn, tek deneme), kanıt adımı bir kez yeniden dener (4 sn × 2). Tüm denemeler tükenirse ajan deterministik yedeğine düşer; kullanıcıya hata gösterilmez.
 
 TypeSafe erişilemezse (anahtar yok, ağ hatası, 429) ajan sessizce Gemini-only moduna düşer; uydurma bir cevap üretilmez. Gemini de erişilemezse yanıt, ölçülen telemetriden üretilen deterministik bir özetle verilir (bkz. `AgentPlanner.generateTelemetryFallback`).
 
