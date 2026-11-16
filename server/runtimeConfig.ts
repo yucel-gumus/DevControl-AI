@@ -140,18 +140,21 @@ function pickStrArray(doc: Record<string, any> | undefined, field: string, fallb
   return [...fallback];
 }
 
-export function normalizeThinkingLevel(model: string, level?: string | null): string | undefined {
+export function normalizeThinkingLevel(model: string, level?: string | null): 'LOW' | 'MEDIUM' | 'HIGH' | undefined {
   if (!level || !String(model).startsWith('gemini-4')) {
     return undefined;
   }
-  let upper = String(level).trim().toUpperCase();
-  if (!['LOW', 'MEDIUM', 'HIGH', 'XHIGH'].includes(upper)) {
-    upper = 'MEDIUM';
+  const raw = String(level).trim().toUpperCase();
+  if (raw === 'XHIGH' || raw === 'MAX') {
+    return 'HIGH';
   }
-  if (upper === 'XHIGH' && !model.toLowerCase().includes('hydrogen')) {
-    upper = 'HIGH';
+  if (raw === 'MINIMAL' || raw === 'OFF' || raw === 'NONE') {
+    return 'LOW';
   }
-  return upper;
+  if (raw === 'LOW' || raw === 'MEDIUM' || raw === 'HIGH') {
+    return raw;
+  }
+  return 'MEDIUM';
 }
 
 export async function refreshRuntimeConfig(force = false): Promise<RuntimeConfig> {
