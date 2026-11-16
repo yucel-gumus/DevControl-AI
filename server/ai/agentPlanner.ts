@@ -530,7 +530,7 @@ ${JSON.stringify(compactProjection, null, 2)}`;
         ? `### 📡 \`${matchedRepo.name}\` için GitHub Telemetrisi Bekleniyor\n\n\`${matchedRepo.name}\` deposu bağlı olsa da analiz penceresinde bu depoya ait doğrulanmış commit, PR veya issue kaydı bulunmuyor. Sağlık skoru ve risk analizi üretmek için lütfen GitHub verilerini yeniden eşitleyin.`
         : `### 📡 GitHub Telemetrisi Bekleniyor\n\nHenüz doğrulanmış GitHub commit veya PR verisi bulunmuyor. Sağlık skoru, kritik dosya ve risk analizi üretmek için lütfen **Depolar & Bağlantı** bölümünden GitHub hesabınızı bağlayın ve verileri eşitleyin.`;
     } else {
-      const aiAnswer = await generateGeminiText(prompt);
+      const aiAnswer = await generateGeminiText(prompt, undefined, undefined, { task: 'ask_ai' });
       aiSynthesisUsed = Boolean(aiAnswer);
       if (aiAnswer) {
         assistantText = aiAnswer;

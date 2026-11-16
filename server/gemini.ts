@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import {
   AI_REQUEST_TIMEOUT_MS,
   AI_TOTAL_TIMEOUT_MS,
@@ -6,21 +6,42 @@ import {
   AI_RETRY_MAX_DELAY_MS,
 } from './constants.js';
 import { boundedExponentialDelay } from './utils/retry.js';
+import {
+  DevControlTask,
+  ensureRuntimeConfig,
+  getGeminiKeys,
+  getTaskModelConfig,
+  normalizeThinkingLevel,
+} from './runtimeConfig.js';
 
-let aiInstance: GoogleGenAI | null = null;
+const aiInstances = new Map<string, GoogleGenAI>();
+
+export interface GeminiThinkingConfig {
+  thinkingLevel: ThinkingLevel;
+}
+
+export interface GeminiCallOptions {
+  task?: DevControlTask;
+  thinkingLevel?: string;
+}
 
 /**
- * Model zinciri en yetenekli modelden en hızlı/hafif modele doğru sıralanır.
- * İlk model kalıcı olmayan bir hata (503/429/zaman aşımı) verirse zincirdeki
- * bir sonraki modele geçilir; böylece yanıt kalitesi kademeli olarak düşer.
+ * Fallback model zinciri. Dinamik öncelik Firestore `system_config/devcontrol` dokümanındadır.
  */
 export const GEMINI_MODEL_CHAIN = [
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
+  'gemini-4-carbon',
+  'gemini-4-hydrogen',
+  'gemini-4-argon',
 ];
+
+function buildThinkingConfigForModel(
+  model: string,
+  requestedLevel?: string | null,
+): GeminiThinkingConfig | undefined {
+  const normalized = normalizeThinkingLevel(model, requestedLevel);
+  if (!normalized) return undefined;
+  return { thinkingLevel: normalized as unknown as ThinkingLevel };
+}
 
 /**
  * Kalıcı olmayan (tekrar denenebilir) Gemini hata mesajlarını tespit eder.
@@ -81,14 +102,10 @@ async function withTimeout<T>(
   }
 }
 
-export function getGeminiAI(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
-
-  if (!aiInstance) {
-    aiInstance = new GoogleGenAI({
+function getOrCreateClient(apiKey: string): GoogleGenAI {
+  let client = aiInstances.get(apiKey);
+  if (!client) {
+    client = new GoogleGenAI({
       apiKey,
       httpOptions: {
         headers: {
@@ -96,9 +113,18 @@ export function getGeminiAI(): GoogleGenAI | null {
         },
       },
     });
+    aiInstances.set(apiKey, client);
   }
+  return client;
+}
 
-  return aiInstance;
+export function getGeminiAI(): GoogleGenAI | null {
+  const keys = getGeminiKeys();
+  const apiKey = keys[0] || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+  return getOrCreateClient(apiKey);
 }
 
 /**
@@ -106,25 +132,23 @@ export function getGeminiAI(): GoogleGenAI | null {
  *
  * Zincir/geri çekilme iskeleti burada İKİNCİ kez kurulmaz: yürütücü tek
  * kaynaktır (`callGeminiWithRetry`) ve bu fonksiyon ona "her modeli bir kez
- * dene" (`maxRetries = 0`) politikasıyla devreder. İki kopya, sağlayıcı
- * kesintisinde iki ayrı geri çekilme politikası demekti: yalnızca birinin
- * düzeltildiği bir hata, aynı 429/503 yanıtında uçları farklı gecikmelerle
- * davrandırırdı.
- *
- * Boş yanıt (metin yok) kalıcı hata sayılır ve `callGeminiWithRetry` zincirdeki
- * sıradaki modele geçer; geri çekilme yalnızca geçici hatalarda uygulanır.
+ * dene" (`maxRetries = 0`) politikasıyla devreder.
  */
 export async function generateGeminiText(
   prompt: string,
   timeoutMs = AI_REQUEST_TIMEOUT_MS,
   maxTotalMs = AI_TOTAL_TIMEOUT_MS,
+  options?: GeminiCallOptions,
 ): Promise<string | null> {
   return callGeminiWithRetry(
-    async (ai, model, signal) => {
+    async (ai, model, signal, thinkingConfig) => {
       const result = await ai.models.generateContent({
         model,
         contents: prompt,
-        config: { abortSignal: signal },
+        config: {
+          abortSignal: signal,
+          ...(thinkingConfig ? { thinkingConfig } : {}),
+        },
       });
       if (!result?.text) {
         throw new Error(`Gemini ${model} boş yanıt döndürdü`);
@@ -134,70 +158,84 @@ export async function generateGeminiText(
     0,
     timeoutMs,
     maxTotalMs,
+    options,
   );
 }
 
 /**
- * Genel amaçlı Gemini işlemi yürütücü. Her deneme kendi AbortSignal'ini alır;
- * böylece zaman aşımına uğrayan istek gerçekten iptal edilir ve kalıcı olmayan
- * hatalarda üstel geri çekilme ile yeniden denenir.
- *
- * ÖNEMLİ: `fn` kendisine verilen `signal`'i `config: { abortSignal: signal }`
- * olarak `generateContent` çağrısına iletmelidir. Aksi halde istek sunucu
- * tarafında iptal edilmez; yalnızca çağıran zaman aşımına uğrar ve yetim
- * kalan istek arka planda API kotasını tüketmeye devam eder.
+ * Genel amaçlı Gemini işlemi yürütücü. Firestore'dan yüklenen görev modelini,
+ * düşünme seviyesini (thinkingLevel), çoklu API anahtarı rotasyonunu ve
+ * fallback zincirini yönetir.
  */
 export async function callGeminiWithRetry<T>(
-  fn: (ai: GoogleGenAI, model: string, signal: AbortSignal) => Promise<T>,
+  fn: (
+    ai: GoogleGenAI,
+    model: string,
+    signal: AbortSignal,
+    thinkingConfig?: GeminiThinkingConfig,
+  ) => Promise<T>,
   maxRetries = 1,
   timeoutMs = AI_REQUEST_TIMEOUT_MS,
   maxTotalMs = AI_TOTAL_TIMEOUT_MS,
+  options?: GeminiCallOptions,
 ): Promise<T | null> {
-  const ai = getGeminiAI();
-  if (!ai) return null;
-  const deadline = Date.now() + maxTotalMs;
+  await ensureRuntimeConfig();
+  const keys = getGeminiKeys();
+  if (keys.length === 0) return null;
 
-  /**
-   * Geri çekilme üssü, deneme sayacından (`attempt`) AYRI ve zincir boyunca
-   * birikir. Model başına sıfırlanan bir sayaçla (`attempt`, en fazla
-   * `maxRetries=1` olduğu için yalnızca 0 görülür) her model aynı taban
-   * gecikmeyi bekler: üstel artış hiç gerçekleşmez, `AI_RETRY_MAX_DELAY_MS`
-   * erişilemez kalır ve art arda geçici hata veren bir sağlayıcıda zincirin
-   * tamamı taban gecikmelerle, artan baskıyla değil, tükenir.
-   */
+  const task: DevControlTask = options?.task || 'ask_ai';
+  const taskCfg = getTaskModelConfig(task);
+  const requestedThinking = options?.thinkingLevel || taskCfg.thinkingLevel;
+
+  const candidateModels: string[] = [];
+  for (const m of [taskCfg.model, ...taskCfg.fallbackModels, ...GEMINI_MODEL_CHAIN]) {
+    if (m && !candidateModels.includes(m)) {
+      candidateModels.push(m);
+    }
+  }
+
+  const deadline = Date.now() + maxTotalMs;
   let backoffExponent = 0;
 
-  for (const model of GEMINI_MODEL_CHAIN) {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const remainingMs = Math.min(timeoutMs, deadline - Date.now());
-      if (remainingMs <= 0) return null;
-      try {
-        return await withTimeout(
-          (signal) => fn(ai, model, signal),
-          remainingMs,
-          `Gemini ${model} API request timed out`,
-        );
-      } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        // Sessiz kalmak teşhisi imkânsız kılardı: zincirin tümü düştüğünde
-        // çağıranlar deterministik bir özete düşer ve kullanıcı yalnızca
-        // "yapay zeka cevabı gelmedi" görür; neden yalnızca burada görünür.
-        console.warn(`[DevControl AI] Model ${model} çağrısında hata alındı:`, errMsg.substring(0, 120));
+  for (const model of candidateModels) {
+    const thinkingConfig = buildThinkingConfigForModel(model, requestedThinking);
 
-        // Kalıcı hata veya deneme hakkı bitti: bu modeli bırak, sıradakine geç
-        if (!isTransientGeminiError(errMsg) || attempt === maxRetries) {
-          break;
+    for (let keyIdx = 0; keyIdx < keys.length; keyIdx++) {
+      const ai = getOrCreateClient(keys[keyIdx]);
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const remainingMs = Math.min(timeoutMs, deadline - Date.now());
+        if (remainingMs <= 0) return null;
+        try {
+          return await withTimeout(
+            (signal) => fn(ai, model, signal, thinkingConfig),
+            remainingMs,
+            `Gemini ${model} API request timed out`,
+          );
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[DevControl AI] Model ${model} (key_${keyIdx + 1}/${keys.length}) çağrısında hata alındı:`,
+            errMsg.substring(0, 120),
+          );
+
+          if (!isTransientGeminiError(errMsg)) {
+            break;
+          }
+
+          if (attempt < maxRetries) {
+            const delayMs = boundedExponentialDelay(
+              backoffExponent,
+              AI_RETRY_BASE_DELAY_MS,
+              AI_RETRY_MAX_DELAY_MS,
+              deadline - Date.now(),
+            );
+            backoffExponent += 1;
+            if (delayMs > 0) {
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+          }
         }
-
-        const delayMs = boundedExponentialDelay(
-          backoffExponent,
-          AI_RETRY_BASE_DELAY_MS,
-          AI_RETRY_MAX_DELAY_MS,
-          deadline - Date.now(),
-        );
-        backoffExponent += 1;
-        if (delayMs <= 0) break;
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
   }

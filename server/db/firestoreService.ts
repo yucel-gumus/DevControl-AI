@@ -133,9 +133,9 @@ export class FirestoreService {
         process.env.GCP_PROJECT;
       const databaseId = process.env.FIRESTORE_DATABASE_ID || '(default)';
 
-      const existingApps = getApps();
-      if (existingApps.length > 0) {
-        this.app = existingApps[0];
+      const defaultApp = getApps().find((app) => app.name === '[DEFAULT]');
+      if (defaultApp) {
+        this.app = defaultApp;
       } else {
         this.app = projectId ? initializeApp({ projectId }) : initializeApp();
       }

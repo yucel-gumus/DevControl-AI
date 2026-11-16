@@ -5,6 +5,7 @@ import {
   TYPESAFE_RETRY_MAX_DELAY_MS,
 } from './constants.js';
 import { boundedExponentialDelay } from './utils/retry.js';
+import { ensureRuntimeConfig, getTypeSafeRuntimeConfig } from './runtimeConfig.js';
 
 export interface ChoiceQuestion {
   type: 'choice';
@@ -105,6 +106,10 @@ const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504, 529]);
  * bu yüzden yok sayılır ve sıradaki ad denenir.
  */
 export function getTypeSafeApiKey(): string | null {
+  const { apiKey } = getTypeSafeRuntimeConfig();
+  if (apiKey) {
+    return apiKey;
+  }
   for (const candidate of [process.env.TYPESAFE_API_KEY, process.env.TYPESAFEAI]) {
     if (typeof candidate === 'string' && candidate.trim()) {
       return candidate.trim();
@@ -353,12 +358,14 @@ async function attemptSystemOneCall(
 export async function callTypeSafeSystemOne(
   options: SystemOneRequestOptions
 ): Promise<SystemOneResponse | null> {
+  await ensureRuntimeConfig();
+  const runtimeCfg = getTypeSafeRuntimeConfig();
   const apiKey = getTypeSafeApiKey();
   if (!apiKey) {
     return null;
   }
 
-  const model = options.model || TYPESAFE_DEFAULT_MODEL;
+  const model = options.model || runtimeCfg.model || TYPESAFE_DEFAULT_MODEL;
   const timeoutMs = options.timeoutMs ?? TYPESAFE_REQUEST_TIMEOUT_MS;
   const maxAttempts = Math.max(1, options.maxAttempts ?? TYPESAFE_MAX_ATTEMPTS);
   const maxTotalMs = options.maxTotalMs ?? timeoutMs * maxAttempts;

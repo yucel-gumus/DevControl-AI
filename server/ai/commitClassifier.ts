@@ -267,13 +267,14 @@ ${JSON.stringify(batch.map((c) => ({ sha: c.sha, message: c.message })), null, 2
     const prompt = this.buildBatchPrompt(batch);
 
     try {
-      const aiResults = await callGeminiWithRetry(async (gemini, model, signal) => {
+      const aiResults = await callGeminiWithRetry(async (gemini, model, signal, thinkingConfig) => {
         const response = await gemini.models.generateContent({
           model,
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
             abortSignal: signal,
+            ...(thinkingConfig ? { thinkingConfig } : {}),
             responseSchema: {
               type: Type.ARRAY,
               items: {
@@ -298,7 +299,7 @@ ${JSON.stringify(batch.map((c) => ({ sha: c.sha, message: c.message })), null, 2
           return JSON.parse(response.text.trim()) as CommitSemanticAnalysis[];
         }
         return null;
-      });
+      }, 1, undefined, undefined, { task: 'commit_classifier' });
 
       if (Array.isArray(aiResults)) {
         const aiMap = new Map(aiResults.map((item) => [item.sha, item]));

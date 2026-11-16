@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { ToolRegistry } from './server/toolRegistry.js';
 import { FirestoreService } from './server/db/firestoreService.js';
+import { ensureRuntimeConfig } from './server/runtimeConfig.js';
 import apiRoutes from './server/routes/api.js';
 
 async function startServer() {
@@ -53,6 +54,7 @@ async function startServer() {
 
   // Firestore & Araç Kayıt Defterini Başlat
   FirestoreService.initialize();
+  await ensureRuntimeConfig();
   ToolRegistry.initialize();
 
   // Modüler API Route'ları

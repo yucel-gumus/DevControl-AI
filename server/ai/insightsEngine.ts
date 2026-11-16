@@ -364,13 +364,14 @@ Genel Sağlık Skoru: ${healthScore.overallScore}
 Aktif Riskler: ${riskScopeSummary}
 `;
 
-    const aiResult = await callGeminiWithRetry(async (gemini, model, signal) => {
+    const aiResult = await callGeminiWithRetry(async (gemini, model, signal, thinkingConfig) => {
       const response = await gemini.models.generateContent({
         model,
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
           abortSignal: signal,
+          ...(thinkingConfig ? { thinkingConfig } : {}),
           responseSchema: {
             type: Type.ARRAY,
             items: {
@@ -404,7 +405,7 @@ Aktif Riskler: ${riskScopeSummary}
         }
       }
       throw unusableModelResponse(model, 'günlük brifing maddeleri');
-    });
+    }, 1, undefined, undefined, { task: 'brief_persona' });
 
     if (aiResult && aiResult.length > 0) {
       return aiResult;
@@ -483,13 +484,14 @@ ${repoCommits.slice(0, 12).map(c => `- ${c.message} (+${c.additions}/-${c.deleti
       `${repoCommits.length} commit içermektedir.`;
 
     try {
-      const result = await callGeminiWithRetry(async (gemini, model, signal) => {
+      const result = await callGeminiWithRetry(async (gemini, model, signal, thinkingConfig) => {
         const response = await gemini.models.generateContent({
           model,
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
             abortSignal: signal,
+            ...(thinkingConfig ? { thinkingConfig } : {}),
             responseSchema: {
               type: Type.OBJECT,
               properties: {
@@ -561,7 +563,7 @@ ${repoCommits.slice(0, 12).map(c => `- ${c.message} (+${c.additions}/-${c.deleti
           recommendedRoadmap: toRoadmapArray(parsed.recommendedRoadmap),
           reviewedAt: new Date().toISOString(),
         };
-      });
+      }, 1, undefined, undefined, { task: 'repo_review' });
 
       return result;
     } catch (e) {
@@ -690,13 +692,14 @@ ${commits.slice(0, 15).map(c => `- ${c.message}`).join('\n') || '- Doğrudan com
 growthAreas) üret. Ölçüm alanları (dil dağılımı, üretkenlik metrikleri) zaten
 telemetriden alındığı için senden istenmez; tahmin veya varsayılan değer üretme.`;
 
-      const aiPersona = await callGeminiWithRetry(async (gemini, model, signal) => {
+      const aiPersona = await callGeminiWithRetry(async (gemini, model, signal, thinkingConfig) => {
         const response = await gemini.models.generateContent({
           model,
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
             abortSignal: signal,
+            ...(thinkingConfig ? { thinkingConfig } : {}),
             responseSchema: {
               type: Type.OBJECT,
               properties: {
@@ -739,7 +742,7 @@ telemetriden alındığı için senden istenmez; tahmin veya varsayılan değer 
           growthAreas: toStringArray(parsed.growthAreas),
           analyzedAt: new Date().toISOString(),
         };
-      });
+      }, 1, undefined, undefined, { task: 'brief_persona' });
 
       return aiPersona || telemetryPersona;
     } catch (e) {
@@ -801,13 +804,14 @@ ${relevantCommits.slice(0, 5).map(c => `- ${c.message}`).join('\n') || '- Yakın
   "expectedImpact": "Beklenen fayda ve regresyon azalması özeti"
 }`;
 
-      const aiRec = await callGeminiWithRetry(async (gemini, model, signal) => {
+      const aiRec = await callGeminiWithRetry(async (gemini, model, signal, thinkingConfig) => {
         const response = await gemini.models.generateContent({
           model,
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
             abortSignal: signal,
+            ...(thinkingConfig ? { thinkingConfig } : {}),
             responseSchema: {
               type: Type.OBJECT,
               properties: {
@@ -858,7 +862,7 @@ ${relevantCommits.slice(0, 5).map(c => `- ${c.message}`).join('\n') || '- Yakın
               : undefined,
           expectedImpact,
         };
-      });
+      }, 1, undefined, undefined, { task: 'hotspot_refactor' });
 
       return aiRec;
     } catch (e) {

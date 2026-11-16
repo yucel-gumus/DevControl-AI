@@ -4,6 +4,7 @@ import githubRoutes from './github.js';
 import metricsRoutes from './metrics.js';
 import aiRoutes from './ai.js';
 import { rateLimit } from 'express-rate-limit';
+import { ensureRuntimeConfig, getDevControlApiToken } from '../runtimeConfig.js';
 
 const router = Router();
 
@@ -36,23 +37,27 @@ function timingSafeEqualStrings(provided: string, expected: string): boolean {
  * herkese açık dağıtımlarda GitHub kotasının ve yapay zeka kredilerinin
  * yetkisiz kullanımı engellenebilir.
  */
-const requireApiToken: RequestHandler = (req, res, next) => {
-  const expectedToken = process.env.DEVCONTROL_API_TOKEN;
-  if (!expectedToken) {
-    return next();
+const requireApiToken: RequestHandler = async (req, res, next) => {
+  try {
+    await ensureRuntimeConfig();
+    const expectedToken = getDevControlApiToken();
+    if (!expectedToken) {
+      return next();
+    }
+
+    const authHeader = req.get('authorization') || '';
+    const providedToken = authHeader.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7).trim()
+      : (req.get('x-api-token') || '').trim();
+
+    if (providedToken && timingSafeEqualStrings(providedToken, expectedToken)) {
+      return next();
+    }
+
+    res.status(401).json({ error: 'Bu API için geçerli bir erişim jetonu gereklidir.' });
+  } catch (err) {
+    next(err);
   }
-
-  const authHeader = req.get('authorization') || '';
-  const providedToken = authHeader.toLowerCase().startsWith('bearer ')
-    ? authHeader.slice(7).trim()
-    : (req.get('x-api-token') || '').trim();
-
-  if (providedToken && timingSafeEqualStrings(providedToken, expectedToken)) {
-    return next();
-  }
-
-
-  res.status(401).json({ error: 'Bu API için geçerli bir erişim jetonu gereklidir.' });
 };
 
 // Sağlık ucu jeton kapısının ÜSTÜNDE tanımlanır: dış izleme (uptime/readiness)

@@ -30,6 +30,7 @@ import { RiskEngine } from '../metrics/riskEngine.js';
 import { HealthEngine } from '../metrics/healthEngine.js';
 import { CommitSemanticClassifier } from '../ai/commitClassifier.js';
 import { FirestoreService, type TelemetrySnapshot } from '../db/firestoreService.js';
+import { ensureRuntimeConfig, getGitHubToken } from '../runtimeConfig.js';
 import { BoundedCache } from '../utils/boundedCache.js';
 import { commitFileNames } from '../utils/commitFiles.js';
 
@@ -424,11 +425,11 @@ export class GitHubService {
   public static getState(): GitHubStoreState {
     if (!this.state) {
       this.state = this.getInitialState();
-      if (process.env.GITHUB_TOKEN) {
-        this.state.token = process.env.GITHUB_TOKEN.trim();
-      }
     }
-    if (!this.state.token && process.env.GITHUB_TOKEN) {
+    const runtimeToken = getGitHubToken();
+    if (runtimeToken) {
+      this.state.token = runtimeToken;
+    } else if (!this.state.token && process.env.GITHUB_TOKEN) {
       this.state.token = process.env.GITHUB_TOKEN.trim();
     }
     this.enforcePersonalRepositoryScope(this.state);
@@ -616,8 +617,9 @@ export class GitHubService {
   }
 
   public static async fetchRepositoryTree(owner: string, repoName: string, defaultBranch = 'main'): Promise<string[]> {
+    await ensureRuntimeConfig();
     const state = this.getState();
-    const token = state.token || process.env.GITHUB_TOKEN;
+    const token = getGitHubToken() || state.token || process.env.GITHUB_TOKEN;
     if (!token) return [];
     const cacheKey = `${owner}/${repoName}/${defaultBranch}`;
     if (this.treeCache.has(cacheKey)) {
@@ -1515,6 +1517,7 @@ export class GitHubService {
   }
 
   public static async ensureSynced(force = false): Promise<GitHubStoreState> {
+    await ensureRuntimeConfig();
     const state = this.getState();
 
     if (this.activeSyncPromise) {
@@ -1606,7 +1609,7 @@ export class GitHubService {
       }
     }
 
-    const token = state.token || process.env.GITHUB_TOKEN;
+    const token = getGitHubToken() || state.token || process.env.GITHUB_TOKEN;
     if (token) {
       return this.syncRepositories();
     }
@@ -1642,8 +1645,9 @@ export class GitHubService {
       await this.activeTogglePromise.catch(() => undefined);
       return this.getState();
     }
+    await ensureRuntimeConfig();
     const state = this.getState();
-    const token = state.token || process.env.GITHUB_TOKEN;
+    const token = getGitHubToken() || state.token || process.env.GITHUB_TOKEN;
     if (token) {
       return this.connectWithToken(token);
     }
