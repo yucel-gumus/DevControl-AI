@@ -9,8 +9,10 @@
  * (bkz. src/utils/apiClient.ts -> EDGE_TIMEOUT_MS).
  */
 interface ImportMetaEnv {
-  /** Dağıtımın uç (edge) zaman aşımı; tanımsızsa Firebase Hosting'in 60 sn sınırı varsayılır. */
+  /** Dağıtımın uç (edge) zaman aşımı; tanımsızsa ortama göre belirlenir. */
   readonly VITE_EDGE_TIMEOUT_MS?: string;
+  /** İsteğe bağlı doğrudan arka uç API taban URL'si (ör. Cloud Run). */
+  readonly VITE_API_BASE_URL?: string;
 }
 
 interface ImportMeta {

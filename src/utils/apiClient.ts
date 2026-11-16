@@ -2,26 +2,38 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 
 const API_TOKEN_STORAGE_KEY = 'devcontrol_api_token';
 
+const PRODUCTION_HOSTING_HOSTS = new Set([
+  'devcontrol-ai.web.app',
+  'devcontrol-ai.firebaseapp.com',
+]);
+
+const DEFAULT_CLOUD_RUN_API_BASE_URL = 'https://devcontrol-ai-270384591051.europe-west3.run.app';
+
+const API_BASE_URL = ((): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (typeof envUrl === 'string' && envUrl.trim() !== '') {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined' && PRODUCTION_HOSTING_HOSTS.has(window.location.hostname)) {
+    return DEFAULT_CLOUD_RUN_API_BASE_URL;
+  }
+  return '';
+})();
+
+function resolveRequestUrl(url: string): string {
+  if (API_BASE_URL && url.startsWith('/')) {
+    return `${API_BASE_URL}${url}`;
+  }
+  return url;
+}
+
 /**
  * Dağıtımın uç (edge) katmanının istek başına zaman aşımı; `null` ise sınır yok.
  *
- * firebase.json tüm istekleri (`"source": "**"`) Cloud Run servisine rewrite
- * eder ve Firebase Hosting, Cloud Run'a proxy'lediği bir isteği 60 saniyede
- * keser (sınır yükseltilemez; kesilen istek istemciye 504 HTML ağ geçidi sayfası
- * olarak döner — JSON değil). Cloud Run'ın kendi zaman aşımı hiçbir zaman
- * bağlayıcı olmaz.
- *
- * Bu yüzden istemci, uç katmanın keseceği bir isteği beklemek yerine kendi
- * iptalini yapar (bkz. capToEdgeLimit): hiçbir bütçe uç sınırını aşamaz. Fark,
- * ayrıştırılamayan bir 504 gövdesi yerine `ApiTimeoutError` görmektir — çağıran
- * katman kullanıcıya gerçek mesajı gösterebilir.
- *
- * `VITE_EDGE_TIMEOUT_MS` ile geçersiz kılınır (Vite değeri derleme anında
- * pakete gömer). Değer 0 ya da negatifse sınır uygulanmaz: uç katmanı olmayan
- * kurulumlar (doğrudan Cloud Run adresi, yerel `npm start`) tam bütçelerini
- * kullanabilir. Ayrıştırılamayan bir değer varsayılana (60 sn) düşer — sessizce
- * "sınır yok" saymak, dağıtımda tam olarak kaçınılan 504 davranışını geri
- * getirirdi.
+ * Doğrudan Cloud Run URL'sine veya yerel sunucuya giden istekler Firebase
+ * Hosting'in 60 saniyelik proxy sınırına takılmaz (`null`). Yalnızca Hosting
+ * proxy'si üzerinden geçen veya `VITE_EDGE_TIMEOUT_MS` ile sınırlandırılan
+ * kurulumlarda tavan uygulanır.
  */
 const EDGE_TIMEOUT_MS = ((): number | null => {
   const raw = import.meta.env.VITE_EDGE_TIMEOUT_MS;
@@ -29,6 +41,15 @@ const EDGE_TIMEOUT_MS = ((): number | null => {
     const parsed = Number(raw);
     if (Number.isFinite(parsed)) {
       return parsed > 0 ? parsed : null;
+    }
+  }
+  if (API_BASE_URL !== '') {
+    return null;
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host.endsWith('.run.app') || host === 'localhost' || host === '127.0.0.1') {
+      return null;
     }
   }
   return 60_000;
@@ -80,17 +101,20 @@ function getStoredApiToken(): string | null {
 }
 
 /**
- * İsteğin aynı kaynağa gittiğini döner.
- *
- * Çağrıların tamamı bugün göreli (`/api/...`) yollar kullanır ve göreli yol her
- * zaman aynı kaynağa çözülür. Ama `apiClient` mutlak bir URL de kabul eder
- * (ör. uç katmanı atlamak için doğrudan bir Cloud Run adresi); bu durumda jeton
- * koşulsuz eklenirse sunucunun sırrı, ihtiyacı olmayan ve kaydedebilecek bir
- * tarafa gider. Çözülemeyen bir URL güvenli taraf sayılır: jeton eklenmez.
+ * İsteğin güvenilen uygulama veya yapılandırılmış arka uç (Cloud Run) kaynağına
+ * gittiğini döner. Çözülemeyen bir URL güvenli taraf sayılır: jeton eklenmez.
  */
-function isSameOriginRequest(url: string): boolean {
+function isTrustedApiRequest(resolvedUrl: string): boolean {
   try {
-    return new URL(url, window.location.origin).origin === window.location.origin;
+    const baseOrigin = window.location.origin;
+    const targetOrigin = new URL(resolvedUrl, baseOrigin).origin;
+    if (targetOrigin === baseOrigin) {
+      return true;
+    }
+    if (API_BASE_URL) {
+      return targetOrigin === new URL(API_BASE_URL, baseOrigin).origin;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -156,13 +180,14 @@ export async function apiClient<T = any>(
     }
   }
   const apiToken = getStoredApiToken();
+  const resolvedUrl = resolveRequestUrl(url);
 
   try {
-    const res = await fetch(url, {
+    const res = await fetch(resolvedUrl, {
       ...fetchOptions,
       signal: controller.signal,
       headers: {
-        ...(apiToken && isSameOriginRequest(url)
+        ...(apiToken && isTrustedApiRequest(resolvedUrl)
           ? { Authorization: `Bearer ${apiToken}` }
           : {}),
         ...(fetchOptions.headers || {}),

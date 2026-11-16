@@ -29,10 +29,20 @@ export interface GeminiCallOptions {
  * Fallback model zinciri. Dinamik öncelik Firestore `system_config/devcontrol` dokümanındadır.
  */
 export const GEMINI_MODEL_CHAIN = [
-  'gemini-4-carbon',
   'gemini-4-hydrogen',
+  'gemini-4-carbon',
   'gemini-4-argon',
 ];
+
+function isTimeoutGeminiError(errMsg: string): boolean {
+  const lower = errMsg.toLowerCase();
+  return (
+    lower.includes('timed out') ||
+    lower.includes('zaman aşımına uğradı') ||
+    lower.includes('aborterror') ||
+    lower.includes('the operation was aborted')
+  );
+}
 
 function buildThinkingConfigForModel(
   model: string,
@@ -199,8 +209,9 @@ export async function callGeminiWithRetry<T>(
 
   for (const model of candidateModels) {
     const thinkingConfig = buildThinkingConfigForModel(model, requestedThinking);
+    let advanceToNextModel = false;
 
-    for (let keyIdx = 0; keyIdx < keys.length; keyIdx++) {
+    for (let keyIdx = 0; keyIdx < keys.length && !advanceToNextModel; keyIdx++) {
       const ai = getOrCreateClient(keys[keyIdx]);
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -218,6 +229,11 @@ export async function callGeminiWithRetry<T>(
             `[DevControl AI] Model ${model} (key_${keyIdx + 1}/${keys.length}) çağrısında hata alındı:`,
             errMsg.substring(0, 120),
           );
+
+          if (isTimeoutGeminiError(errMsg)) {
+            advanceToNextModel = true;
+            break;
+          }
 
           if (!isTransientGeminiError(errMsg)) {
             break;

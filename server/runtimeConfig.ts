@@ -15,11 +15,19 @@ export interface RuntimeConfig {
   typesafeModel: string;
   devcontrolApiToken: string;
   fallbackModels: string[];
+  corsOrigins: string[];
   tasks: Record<DevControlTask, { model: string; thinkingLevel: string }>;
   loadedFromFirestore: boolean;
 }
 
-const DEFAULT_FALLBACK_MODELS = ['gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-4-argon'];
+const DEFAULT_FALLBACK_MODELS = ['gemini-4-hydrogen', 'gemini-4-carbon', 'gemini-4-argon'];
+
+const DEFAULT_CORS_ORIGINS = [
+  'https://devcontrol-ai.web.app',
+  'https://devcontrol-ai.firebaseapp.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
 
 const TASK_DEFAULTS: Record<DevControlTask, { model: string; thinkingLevel: string }> = {
   commit_classifier: { model: 'gemini-4-hydrogen', thinkingLevel: 'low' },
@@ -73,6 +81,20 @@ function getEnvTypeSafeKey(): string | null {
   return null;
 }
 
+function getEnvCorsOrigins(): string[] {
+  const raw = process.env.CORS_ORIGINS;
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const parsed = raw
+      .split(',')
+      .map((item) => item.trim().replace(/\/+$/, ''))
+      .filter(Boolean);
+    if (parsed.length > 0) {
+      return parsed;
+    }
+  }
+  return [...DEFAULT_CORS_ORIGINS];
+}
+
 function buildFallbackConfig(): RuntimeConfig {
   return {
     geminiKeys: getEnvGeminiKeys(),
@@ -81,6 +103,7 @@ function buildFallbackConfig(): RuntimeConfig {
     typesafeModel: (process.env.TYPESAFE_MODEL || 'jev-latest').trim(),
     devcontrolApiToken: (process.env.DEVCONTROL_API_TOKEN || '').trim(),
     fallbackModels: [...DEFAULT_FALLBACK_MODELS],
+    corsOrigins: getEnvCorsOrigins(),
     tasks: {
       commit_classifier: { ...TASK_DEFAULTS.commit_classifier },
       brief_persona: { ...TASK_DEFAULTS.brief_persona },
@@ -178,6 +201,9 @@ export async function refreshRuntimeConfig(force = false): Promise<RuntimeConfig
         'fallback_models',
         pickStrArray(llmData, 'fallback_models', base.fallbackModels),
       );
+      const corsOrigins = pickStrArray(devData, 'cors_origins', base.corsOrigins)
+        .map((origin) => origin.replace(/\/+$/, ''))
+        .filter(Boolean);
 
       const tasks: RuntimeConfig['tasks'] = {
         commit_classifier: {
@@ -209,6 +235,7 @@ export async function refreshRuntimeConfig(force = false): Promise<RuntimeConfig
         typesafeModel,
         devcontrolApiToken,
         fallbackModels,
+        corsOrigins,
         tasks,
         loadedFromFirestore: llmSnap.exists || devSnap.exists,
       };
@@ -267,6 +294,10 @@ export function getGitHubToken(): string {
 
 export function getDevControlApiToken(): string {
   return getRuntimeConfigSnapshot().devcontrolApiToken;
+}
+
+export function getCorsOrigins(): string[] {
+  return getRuntimeConfigSnapshot().corsOrigins;
 }
 
 export function getTypeSafeRuntimeConfig(): { apiKey: string | null; model: string } {

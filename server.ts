@@ -4,37 +4,26 @@ import fs from 'fs';
 import path from 'path';
 import { ToolRegistry } from './server/toolRegistry.js';
 import { FirestoreService } from './server/db/firestoreService.js';
-import { ensureRuntimeConfig } from './server/runtimeConfig.js';
+import { ensureRuntimeConfig, getCorsOrigins } from './server/runtimeConfig.js';
 import apiRoutes from './server/routes/api.js';
 
 async function startServer() {
   const app = express();
   app.disable('x-powered-by');
-  // Cloud Run / Firebase Hosting arkasında istemci IP'si X-Forwarded-For ile gelir.
-  // Varsayılan istek yolu iki proxy'den geçer: Firebase Hosting'in Google Front
-  // End'i ve Cloud Run'ın kendi ön ucu; bu yüzden sağdan İKİ atlama güvenilirdir.
-  //
-  // SAYI GERÇEKLE UYUŞMALI: güvenilen atlama sayısı gerçekte geçilen proxy
-  // sayısından FAZLA olursa proxy-addr zincirin en solundaki — istemcinin
-  // yazdığı — adrese düşer ve `req.ip` saldırganın uydurduğu değere dönüşür;
-  // express-rate-limit (varsayılan anahtar: req.ip) de her isteği yeni bir
-  // istemci sayar, yani limit hiç tetiklenmez. Cloud Run URL'sine doğrudan
-  // erişilen bir kurulumda bu yüzden TRUST_PROXY_HOPS=1 verilmelidir.
-  // 1'in maliyeti: Firebase Hosting yolunda `req.ip` paylaşılan GFE çıkış IP'si
-  // olur ve tüm ziyaretçiler TEK sayaçta toplanır (biri limiti doldurunca herkes
-  // 429 alır). Express'in `true` (tüm zincire güven) ayarı hiçbir kurulumda
-  // kullanılmaz: her koşulda istemci uydurmasına açıktır.
-  const configuredTrustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 2);
+  // Cloud Run önünde istemci IP'si X-Forwarded-For ile gelir.
+  // Varsayılan doğrudan Cloud Run istek yolu yalnızca Cloud Run'ın kendi ön ucundan
+  // (GFE) geçer; bu yüzden sağdan BİR atlama güvenilirdir. İki atlama varsayılsaydı
+  // doğrudan Cloud Run'a gelen isteklerde istemcinin yazdığı X-Forwarded-For değerine
+  // düşülür ve hız sınırı atlatılabilirdi. Özel proxy zinciri için TRUST_PROXY_HOPS
+  // ortam değişkeni kullanılabilir.
+  const configuredTrustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 1);
   const trustProxyHops = Number.isInteger(configuredTrustProxyHops) && configuredTrustProxyHops >= 1
     ? configuredTrustProxyHops
-    : 2;
-  // Geçersiz bir değer sessizce 2'ye düşerse operatör ayarının uygulandığını
-  // sanır: doğrudan Cloud Run'a erişilen bir kurulumda bu, `req.ip`'in istemci
-  // uydurmasına açık kalması (ve hız sınırının baypas edilebilmesi) demektir.
+    : 1;
   if (process.env.TRUST_PROXY_HOPS !== undefined && trustProxyHops !== configuredTrustProxyHops) {
     console.warn(
       `[DevControl AI] TRUST_PROXY_HOPS="${process.env.TRUST_PROXY_HOPS}" geçersiz sayı; ` +
-      `${trustProxyHops} atlama varsayıldı. Cloud Run'a doğrudan erişilen kurulumda TRUST_PROXY_HOPS=1 verilmelidir.`,
+      `${trustProxyHops} atlama varsayıldı.`,
     );
   }
   app.set('trust proxy', trustProxyHops);
@@ -49,13 +38,33 @@ async function startServer() {
     next();
   });
 
-  // JSON request body parser
-  app.use(express.json());
-
   // Firestore & Araç Kayıt Defterini Başlat
   FirestoreService.initialize();
   await ensureRuntimeConfig();
   ToolRegistry.initialize();
+
+  // API CORS ara katmanı (OPTIONS preflight ve gövde ayrıştırma hataları dahil)
+  app.use('/api', (req, res, next) => {
+    const rawOrigin = req.headers.origin;
+    if (typeof rawOrigin === 'string' && rawOrigin.trim() !== '') {
+      const normalizedOrigin = rawOrigin.trim().replace(/\/+$/, '');
+      const allowedOrigins = getCorsOrigins();
+      res.vary('Origin');
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(normalizedOrigin)) {
+        res.setHeader('Access-Control-Allow-Origin', rawOrigin.trim());
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Token');
+        res.setHeader('Access-Control-Max-Age', '86400');
+      }
+    }
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    next();
+  });
+
+  // JSON request body parser
+  app.use(express.json());
 
   // Modüler API Route'ları
   app.use('/api', apiRoutes);

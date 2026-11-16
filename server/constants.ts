@@ -57,8 +57,8 @@ export const TREE_ENTRY_LIMIT = 150;
  */
 export const MAX_COMMIT_FILES = 20;
 export const GITHUB_REQUEST_TIMEOUT_MS = 15_000;
-export const AI_REQUEST_TIMEOUT_MS = 35_000;
-export const AI_TOTAL_TIMEOUT_MS = 45_000;
+export const AI_REQUEST_TIMEOUT_MS = 85_000;
+export const AI_TOTAL_TIMEOUT_MS = 120_000;
 
 // Gemini model zinciri için üstel geri çekilme (exponential backoff) sınırları
 export const AI_RETRY_BASE_DELAY_MS = 400;
@@ -101,10 +101,10 @@ export const TYPESAFE_FACT_CHECK_MAX_ATTEMPTS = 2;
  * istemciyi iptal ettirir; sunucu ise üretmeye devam edip faturalandırdığı
  * cevabı kullanıcıya hiç gösteremezdi.
  *
- * Bu toplam (163 sn) dağıtımda uç katmanın sınırına indirgenir (bkz.
- * `TELEMETRY_SYNC_WAIT_TIMEOUT_MS` -> SINIR ve src/utils/apiClient.ts ->
- * EDGE_TIMEOUT_MS): Hosting arkasında 60 sn'yi aşan hiçbir istek sonuç
- * döndüremez.
+ * Doğrudan Cloud Run adresine giden isteklerde uç katmanın (Firebase Hosting)
+ * 60 sn sınırı devreye girmez ve bütçenin tamamı (300 sn Cloud Run sınırı içinde)
+ * kullanılabilir (bkz. src/utils/apiClient.ts -> EDGE_TIMEOUT_MS). Yalnızca Hosting
+ * proxy'si üzerinden geçen ortamlarda 60 sn sınırına indirgenir.
  */
 export const AI_ASK_WORST_CASE_MS =
   TYPESAFE_INTENT_TIMEOUT_MS * TYPESAFE_INTENT_MAX_ATTEMPTS +
@@ -127,19 +127,12 @@ export const AI_ASK_WORST_CASE_MS =
  * Tek kaynak: yedi istemci çağrısına kopyalanmış 120 sn sabiti, sunucu
  * bütçeleri ya da eşitleme süresi değiştiğinde sessizce ayrışırdı.
  *
- * SINIR: Bu bütçenin tamamı dağıtımda KULLANILAMAZ. firebase.json tüm istekleri
- * (`"source": "**"`) Cloud Run'a rewrite eder ve Firebase Hosting, Cloud Run'a
- * proxy'lediği isteği 60 saniyede keser (sınır yükseltilemez; kesilen istek
- * istemciye 504 HTML ağ geçidi sayfası olarak döner). İstemci bu yüzden bütçeyi
- * uç sınırına indirger (bkz. src/utils/apiClient.ts -> EDGE_TIMEOUT_MS) ve uzun
- * süren bir ilk eşitleme Hosting arkasında hiçbir zaman tamamlanamaz: soğuk
- * başlangıçta eşitlemeyi bekleyen uçlar istemci tarafından iptal edilir. Bütçe,
- * uç sınırı olmayan kurulumlarda (doğrudan Cloud Run adresi ya da yerel
- * `npm start`; `VITE_EDGE_TIMEOUT_MS` ile bildirilir) olduğu gibi geçerlidir.
- * Uç sınırını aşan bir eşitlemeyi kaldırabilmenin tek yolu eşitlemeyi istekten
- * ayırmaktır (bkz. README -> Dağıtım notları).
+ * SINIR: API istekleri doğrudan Cloud Run URL'sine yönlendirildiğinde Cloud Run'ın
+ * 300 sn'lik zaman aşımı içinde bu bütçe eksiksiz çalışır; Firebase Hosting proxy'si
+ * arkasından geçilen bir kurulumda ise Hosting 60 sn'de isteği keser (bkz.
+ * src/utils/apiClient.ts -> EDGE_TIMEOUT_MS).
  */
-export const TELEMETRY_SYNC_WAIT_TIMEOUT_MS = 120_000;
+export const TELEMETRY_SYNC_WAIT_TIMEOUT_MS = 150_000;
 
 export const STALE_ISSUE_THRESHOLD_DAYS = 14;
 export const STALE_PR_THRESHOLD_DAYS = 7;

@@ -281,7 +281,7 @@ router.post('/repo-review', asyncHandler(async (req, res) => {
     // inceleme gibi sunulacak uydurma veri oluştururdu; bunun yerine durum
     // açıkça bildirilir.
     return res.status(503).json({
-      error: 'Yapay zeka incelemesi şu anda üretilemedi. Yapay zeka katmanının (GEMINI_API_KEY) yapılandırıldığından emin olun ve birkaç dakika sonra yeniden deneyin.',
+      error: 'Yapay zeka incelemesi şu anda yoğunluk veya zaman aşımı nedeniyle tamamlanamadı. Lütfen birkaç saniye sonra yeniden deneyin.',
     });
   }
 
