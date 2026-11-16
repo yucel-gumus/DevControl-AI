@@ -107,11 +107,11 @@ const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504, 529]);
  */
 export function getTypeSafeApiKey(): string | null {
   const { apiKey } = getTypeSafeRuntimeConfig();
-  if (apiKey) {
+  if (apiKey && /^[\x21-\x7E]+$/.test(apiKey)) {
     return apiKey;
   }
   for (const candidate of [process.env.TYPESAFE_API_KEY, process.env.TYPESAFEAI]) {
-    if (typeof candidate === 'string' && candidate.trim()) {
+    if (typeof candidate === 'string' && /^[\x21-\x7E]+$/.test(candidate.trim())) {
       return candidate.trim();
     }
   }

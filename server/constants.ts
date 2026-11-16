@@ -57,8 +57,8 @@ export const TREE_ENTRY_LIMIT = 150;
  */
 export const MAX_COMMIT_FILES = 20;
 export const GITHUB_REQUEST_TIMEOUT_MS = 15_000;
-export const AI_REQUEST_TIMEOUT_MS = 15_000;
-export const AI_TOTAL_TIMEOUT_MS = 30_000;
+export const AI_REQUEST_TIMEOUT_MS = 35_000;
+export const AI_TOTAL_TIMEOUT_MS = 45_000;
 
 // Gemini model zinciri için üstel geri çekilme (exponential backoff) sınırları
 export const AI_RETRY_BASE_DELAY_MS = 400;

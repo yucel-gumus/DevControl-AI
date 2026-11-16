@@ -60,9 +60,13 @@ function getEnvGeminiKeys(): string[] {
   return keys;
 }
 
+function isValidHeaderSecret(val: string | null | undefined): val is string {
+  return typeof val === 'string' && /^[\x21-\x7E]+$/.test(val.trim());
+}
+
 function getEnvTypeSafeKey(): string | null {
   for (const candidate of [process.env.TYPESAFE_API_KEY, process.env.TYPESAFEAI]) {
-    if (typeof candidate === 'string' && candidate.trim()) {
+    if (isValidHeaderSecret(candidate)) {
       return candidate.trim();
     }
   }
@@ -165,7 +169,8 @@ export async function refreshRuntimeConfig(force = false): Promise<RuntimeConfig
 
       const geminiKeys = fsKeys.length > 0 ? fsKeys : base.geminiKeys;
       const githubToken = pickStr(devData, 'github_token') || base.githubToken;
-      const typesafeKey = pickStr(devData, 'typesafe_api_key') || base.typesafeApiKey;
+      const rawTypeSafeKey = pickStr(devData, 'typesafe_api_key');
+      const typesafeKey = isValidHeaderSecret(rawTypeSafeKey) ? rawTypeSafeKey : base.typesafeApiKey;
       const typesafeModel = pickStr(devData, 'typesafe_model', base.typesafeModel);
       const devcontrolApiToken = pickStr(devData, 'devcontrol_api_token') || base.devcontrolApiToken;
       const fallbackModels = pickStrArray(
