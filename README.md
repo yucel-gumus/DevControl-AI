@@ -69,12 +69,11 @@ TypeSafe erişilemezse (anahtar yok, ağ hatası, 429) ajan sessizce Gemini-only
 
 ---
 
-## 🎨 Tasarım Mimarisi (60-30-10 Kuralı)
-Arayüz, modern geliştirici araçları estetiği ve UI/UX standartları gözetilerek **yalnızca 3 renk** ile 60-30-10 kuralına göre tasarlanmıştır:
-- **%60 DOMINANT (`#b9aba9`):** Dinlendirici, zarif toprak ve taş tonunda geniş ana tuval ve sayfa tabanı.
-- **%30 SECONDARY (`#cdc1b5`):** Açık kumtaşı renginde Bento grid kartları, yan menü, üst bar ve paneller.
-- **%10 ACCENT (`#f9b88e`):** Sıcak kayısı / mercan tonunda etkileşimli butonlar, aktif sekmeler ve durum rozetleri.
-- **Tipografi:** WCAG AAA uyumlu yüksek kontrastlı zengin espresso mürekkep (`#231c1a`).
+## 🎨 Tasarım Mimarisi (İpek Küllü Arduvaz — 60-30-10 Kuralı)
+Arayüz, modern geliştirici araçları estetiği ve WCAG AA/AAA okunabilirlik standartları gözetilerek **İpek Küllü Arduvaz** 10-hex 60-30-10 sistemiyle tasarlanmıştır:
+- **%60 Dominant — Açık Sis Yeşili (`#F5F9F5`, `#EDF3EE`, `#DBE6DD`):** Girdi/açık zemin, ana sayfa tuvali ve sakin bant/hover katmanları.
+- **%30 Secondary — Küllü Arduvaz (`#DCE3EA`, `#BCC7D2`, `#3E5164`, `#253341`):** Kartlar, yan menü, üst çubuk, modallar, kenarlıklar ve yüksek kontrastlı arduvaz mürekkebi tipografi.
+- **%10 Accent — Kiremit-Mercan (`#F2A488`, `#EC7D55`, `#AB421C`):** Yumuşak vurgular, birincil eylem düğmeleri, aktif sekmeler ve hata/bağlantı vurguları.
 
 ---
 

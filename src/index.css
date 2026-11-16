@@ -2,63 +2,56 @@
 
 :root {
   /* ==========================================================================
-     DEVCONTROL AI — 3 RENK MERKEZİ PALET (60 - 30 - 10 KURALI)
-     İstenen 3 renk: #b9aba9, #f9b88e, #cdc1b5
+     DEVCONTROL AI — İPEK KÜLLÜ ARDUVAZ PALETİ (60 - 30 - 10 KURALI)
+     Yalnızca 10 kanonik hex; 4. renk tonu yok.
 
-     Paletin kendisi (üç hex) ve tipografi mürekkebi burada tanımlıdır; rol
-     takma adları (`--dominant-bg` gibi) kaldırıldı — hiçbiri okunmuyordu ve
-     bileşenler rengi doğrudan Tailwind sınıfıyla (`bg-[#cdc1b5]`) yazıyor,
-     yani okunmayan bir ad yalnızca ikinci bir "gerçek kaynak" izlenimi
-     verirdi. Aynı gerekçeyle kullanılmayan `.surface-card` / `.btn-accent` /
-     `.badge-accent` kural setleri de kaldırıldı: elle yazılmış CSS'i Tailwind
-     budamaz, bu yüzden her biri pakete kalıcı olarak giriyordu.
+     %60 Dominant (Açık Sis Yeşili):
+       --bg-light: #F5F9F5   (açık zemin, girdi alanı, koyu vurgu üstü metin)
+       --bg-page:  #EDF3EE   (ana sayfa tabanı, geniş tuval)
+       --bg-band:  #DBE6DD   (hover, bant, sakin etiket zemini)
+
+     %30 Secondary (Küllü Arduvaz):
+       --surface:      #DCE3EA (kartlar, yan menü, üst çubuk, modallar)
+       --border:       #BCC7D2 (kenarlıklar, ayırıcılar, iz yolları)
+       --ink-muted:    #3E5164 (yardımcı metin, etiketler — AA/AAA kontrast)
+       --ink-primary:  #253341 (ana metin ve simgeler — AAA kontrast)
+
+     %10 Accent (Kiremit-Mercan):
+       --accent-soft:   #F2A488 (yumuşak vurgu, ikincil rozet/seri)
+       --accent-cta:    #EC7D55 (birincil CTA [#253341 metin], aktif halka/sekme)
+       --accent-strong: #AB421C (CTA hover [#F5F9F5 metin], uyarı/hata ve bağlantı)
      ========================================================================== */
 
-  /* 60% DOMINANT: Ana sayfa tabanı, geniş tuval (#b9aba9) */
-  --c60: #b9aba9;
+  --bg-light: #F5F9F5;
+  --bg-page: #EDF3EE;
+  --bg-band: #DBE6DD;
 
-  /* 30% SECONDARY: Kartlar, paneller, kenarlıklar, yan menü, üst çubuk (#cdc1b5) */
-  --c30: #cdc1b5;
+  --surface: #DCE3EA;
+  --border: #BCC7D2;
+  --ink-muted: #3E5164;
+  --ink-primary: #253341;
 
-  /* 10% ACCENT: Butonlar, aktif sekmeler, vurgu hapları, etkileşimli elemanlar (#f9b88e) */
-  --c10: #f9b88e;
-
-  /* Kenarlıklar (Toprak ve taş paletiyle uyumlu, zarif) */
-  --border-subtle: #a89997;
-  --border-strong: #918280;
-
-  /*
-   * Okunabilir Tipografi (zengin espresso mürekkep) — ölçülen kontrast oranları:
-   *
-   *   --ink-primary  #231c1a  9.50:1 (yüzey) / 7.56:1 (tuval) → AAA
-   *   --ink-secondary #4a3e3b 5.82:1 (yüzey) / 4.63:1 (tuval) → AA
-   *   --ink-muted    #6e5f5c  3.44:1 (yüzey) / 2.74:1 (tuval) → AA'nın ALTINDA
-   *
-   * `--ink-muted` bu yüzden YALNIZCA grafik öğelerinde (ikon, SVG eksen çizgisi,
-   * grafik serisi) kullanılır: orada eşik 3:1'dir ve tuvale düşen bir ikon
-   * 2.74:1 ile bu eşiği de kıl payı kaçırdığı için ikonlar çoğunlukla yüzey
-   * rengi üzerinde durur. Metin (11-12px yardımcı metin dahil) hiçbir zaman
-   * `--ink-muted` ile yazılmaz; metin için `--ink-secondary` kullanılır.
-   */
-  --ink-primary: #231c1a;
-  --ink-secondary: #4a3e3b;
-  --ink-muted: #6e5f5c;
+  --accent-soft: #F2A488;
+  --accent-cta: #EC7D55;
+  --accent-strong: #AB421C;
 }
 
 @theme {
-  --color-c60: var(--c60);
-  --color-c30: var(--c30);
-  --color-c10: var(--c10);
-  --color-dominant: var(--c60);
-  --color-secondary: var(--c30);
-  --color-accent: var(--c10);
-  --color-ink-primary: var(--ink-primary);
-  --color-ink-secondary: var(--ink-secondary);
+  --color-c60-light: var(--bg-light);
+  --color-c60: var(--bg-page);
+  --color-c60-band: var(--bg-band);
+  --color-c30: var(--surface);
+  --color-c30-border: var(--border);
   --color-ink-muted: var(--ink-muted);
+  --color-ink-primary: var(--ink-primary);
+  --color-c10-soft: var(--accent-soft);
+  --color-c10: var(--accent-cta);
+  --color-c10-strong: var(--accent-strong);
 }
 
 body {
-  background-color: var(--c60);
+  background-color: var(--bg-page);
+  background-image: linear-gradient(180deg, var(--bg-page) 0%, var(--bg-band) 100%);
   color: var(--ink-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
@@ -67,21 +60,21 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Özel İnce ve Uyumlu Kaydırma Çubuğu */
+/* İnce ve Paletle Uyumlu Kaydırma Çubuğu */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--c60);
+  background: var(--bg-page);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-subtle);
+  background: var(--border);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
+  background: var(--ink-muted);
 }

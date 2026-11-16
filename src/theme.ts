@@ -1,34 +1,54 @@
 /**
- * DevControl AI — 3 Renk Merkezi Palet (60 - 30 - 10 Kuralı)
- * İstenen 3 renk: #b9aba9, #f9b88e, #cdc1b5
+ * DevControl AI — İpek Küllü Arduvaz Paleti (60 - 30 - 10 Kuralı)
+ * Yalnızca 10 kanonik hex; grafik ve veri görselleştirme sabitleri.
  *
- * Canvas ve yüzey renkleri src/index.css içindeki CSS değişkenlerinde tanımlıdır;
- * burada yalnızca Recharts gibi JavaScript tarafında tema değeri gerektiren
- * anahtarlar tutulur.
+ * Tuval ve yüzey değişkenleri src/index.css içindedir; burada Recharts ve
+ * grafik serilerinin tek renk kaynağı tutulur.
  */
 
-/**
- * Recharts ve veri görselleştirme teması (3 renkle sınırlı).
- *
- * Grafik renkleri burada tek yerde toplanır: ölçülen kontrast oranlarına göre
- * seçilmiş tonların bileşen içine dağılmış kopyaları, bir düzenlemede sessizce
- * ayrışır ve palet kuralının (bkz. src/index.css) denetimi imkânsızlaşır.
- */
 export const CHART_THEME = {
-  tooltipBg: '#cdc1b5',
-  tooltipBorder: '#918280',
-  textInk: '#231c1a',
+  tooltipBg: '#F5F9F5',
+  tooltipBorder: '#BCC7D2',
+  tooltipShadow: '0 4px 12px rgba(37, 51, 65, 0.15)',
+  textInk: '#253341',
   /** Eksen çizgisi — grafik öğesi, metin değil. */
-  axisLine: '#a89997',
-  /**
-   * Eksen etiketleri 11px **metindir**. Palet kuralı metinde `--ink-muted`
-   * (#6e5f5c) kullanımını yasaklar: yüzey üzerinde 3.44:1 ile WCAG AA'nın
-   * (4.5:1) altında kalır. Bu yüzden etiketler `--ink-secondary` ile yazılır.
-   */
-  axisText: '#4a3e3b',
-  seriesPrimaryStroke: '#231c1a',
-  seriesPrimaryFill: '#f9b88e',
-  seriesSecondaryStroke: '#4a3e3b',
-  /** Seri dolgusu — grafik öğesi (3:1 eşiği); metin için kullanılamaz. */
-  seriesSecondaryFill: '#6e5f5c',
+  axisLine: '#BCC7D2',
+  /** Eksen etiketleri (11px metin) — WCAG AA/AAA için #3E5164 kullanılır. */
+  axisText: '#3E5164',
+  seriesPrimaryStroke: '#AB421C',
+  seriesPrimaryFill: '#EC7D55',
+  seriesSecondaryStroke: '#253341',
+  seriesSecondaryFill: '#3E5164',
 } as const;
+
+/**
+ * Dil çubukları, çoklu seriler ve şiddet ölçeği için uyumlu palet dizisi.
+ */
+export const SERIES_PALETTE = [
+  '#EC7D55',
+  '#AB421C',
+  '#253341',
+  '#3E5164',
+  '#F2A488',
+  '#BCC7D2',
+] as const;
+
+/**
+ * Risk ve öncelik rozetleri için tek renk eşlemesi.
+ * Tüm bileşenler seviye renklerini buradan alır; tutarlı kontrast garantisi.
+ */
+export function getSeverityBadgeClass(level?: string): string {
+  switch ((level || '').toUpperCase()) {
+    case 'CRITICAL':
+      return 'bg-[#AB421C] text-[#F5F9F5] border-[#AB421C]';
+    case 'HIGH':
+      return 'bg-[#EC7D55] text-[#253341] border-[#AB421C]';
+    case 'MEDIUM':
+      return 'bg-[#F2A488] text-[#253341] border-[#EC7D55]';
+    case 'OPPORTUNITY':
+      return 'bg-[#253341] text-[#F5F9F5] border-[#253341]';
+    case 'LOW':
+    default:
+      return 'bg-[#DBE6DD] text-[#3E5164] border-[#BCC7D2]';
+  }
+}

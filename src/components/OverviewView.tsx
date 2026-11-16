@@ -20,7 +20,7 @@ import {
 import { useDeveloperPersona } from '../hooks/useMetrics.js';
 import { PRIORITY_TR_MAP } from '../constants.js';
 import { ACTIVITY_WINDOW_DAYS } from '../../server/constants.js';
-import { CHART_THEME } from '../theme.js';
+import { CHART_THEME, SERIES_PALETTE, getSeverityBadgeClass } from '../theme.js';
 import { formatDate, formatTrNumber, formatMeasuredCount } from '../utils/formatters.js';
 import {
   ActivityData,
@@ -58,7 +58,7 @@ class ChartErrorBoundary extends React.Component<
   render(): React.ReactNode {
     if (this.state.failed) {
       return (
-        <div className="h-full flex items-center justify-center text-xs text-[#4a3e3b] text-center">
+        <div className="h-full flex items-center justify-center text-xs text-[#AB421C] font-medium text-center">
           Grafik bileşeni yüklenemedi; diğer telemetri kartları bu durumdan etkilenmedi.
         </div>
       );
@@ -167,16 +167,16 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, icon, description, onActivate,
       onClick={onActivate}
       aria-labelledby={`${labelId} ${valueId}`}
       aria-describedby={descriptionId}
-      className="w-full text-left p-4 rounded-xl border border-[#a89997] bg-[#cdc1b5] hover:bg-[#cdc1b5]/80 transition-all cursor-pointer shadow-xs group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#231c1a]"
+      className="w-full text-left p-4 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] hover:bg-[#DBE6DD] transition-colors cursor-pointer shadow-xs group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#253341]"
     >
       <span className="flex items-center justify-between">
-        <span id={labelId} className="text-xs font-bold text-[#4a3e3b]">{label}</span>
-        <span className="p-1.5 rounded-lg bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 group-hover:scale-105 transition-transform inline-flex">
+        <span id={labelId} className="text-xs font-bold text-[#3E5164]">{label}</span>
+        <span className="p-1.5 rounded-lg bg-[#DBE6DD] text-[#253341] border border-[#BCC7D2] group-hover:bg-[#EC7D55] group-hover:border-[#AB421C] transition-colors inline-flex">
           {icon}
         </span>
       </span>
       <span id={valueId} className="mt-3 flex items-baseline gap-2">{children}</span>
-      <span id={descriptionId} className="block text-[11px] mt-2 text-[#4a3e3b]">{description}</span>
+      <span id={descriptionId} className="block text-[11px] mt-2 text-[#3E5164]">{description}</span>
     </button>
   );
 };
@@ -289,24 +289,24 @@ export const OverviewView: React.FC<Props> = ({
   const growthAreas = persona?.growthAreas ?? [];
 
   return (
-    <div id="overview-view" className="space-y-6 font-sans text-[#231c1a]">
+    <div id="overview-view" className="space-y-6 font-sans text-[#253341]">
       {/* AI Geliştirici Kimliği & Hız Karnesi (Developer Persona Hero) */}
-      <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-4 shadow-xs relative overflow-hidden">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-[#a89997] pb-4">
+      <div className="p-5 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] space-y-4 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-[#BCC7D2] pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#f9b88e] border border-[#231c1a]/15 flex items-center justify-center shrink-0 text-[#231c1a] shadow-xs">
+            <div className="w-9 h-9 rounded-lg bg-[#EC7D55] border border-[#AB421C] flex items-center justify-center shrink-0 text-[#253341] shadow-xs">
               <Brain className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#F2A488] text-[#253341] border border-[#EC7D55]">
                   AI Mühendislik Kimliği
                 </span>
-                <span className="text-[11px] text-[#4a3e3b] font-medium">
+                <span className="text-[11px] text-[#3E5164] font-medium">
                   KENSAI Analizi
                 </span>
               </div>
-              <h2 className="text-base font-bold text-[#231c1a] mt-0.5 tracking-tight">
+              <h2 className="text-base font-bold text-[#253341] mt-0.5 tracking-tight">
                 {/* Üretilemeyen kimlik için uydurma bir unvan gösterilmez
                     (bkz. README: sistemde sahte veri bulunmaz); üç durum ayrı
                     yazılır. */}
@@ -322,18 +322,18 @@ export const OverviewView: React.FC<Props> = ({
           {/* Hızlı Metrik Rozetleri */}
           {persona && persona.productivityMetrics && (
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="px-2.5 py-1 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-xs font-bold text-[#231c1a] flex items-center gap-1.5 shadow-xs">
-                <Zap className="w-3.5 h-3.5 text-[#231c1a]" />
+              <div className="px-2.5 py-1 rounded-lg border border-[#EC7D55] bg-[#F2A488] text-xs font-bold text-[#253341] flex items-center gap-1.5 shadow-xs">
+                <Zap className="w-3.5 h-3.5 text-[#253341]" />
                 <span>{persona.productivityMetrics.weeklyCommitFrequency ?? 0} commit/hf</span>
               </div>
-              <div className="px-2.5 py-1 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-xs font-bold text-[#231c1a] flex items-center gap-1.5 shadow-xs">
-                <Award className="w-3.5 h-3.5 text-[#231c1a]" />
+              <div className="px-2.5 py-1 rounded-lg border border-[#BCC7D2] bg-[#DBE6DD] text-xs font-bold text-[#253341] flex items-center gap-1.5 shadow-xs">
+                <Award className="w-3.5 h-3.5 text-[#253341]" />
                 {/* Ölçüm üretilemediğinde sunucu bunu açıkça belirten bir dize
                     üretir. `|| 'Ölçüm yok'` yalnızca alanı hiç taşımayan eski
                     önbellek kayıtları içindir; uydurulmuş bir değer değildir. */}
                 <span>Hijyen: {persona.productivityMetrics.conventionalCommitHygiene || 'Ölçüm yok'}</span>
               </div>
-              <div className="px-2.5 py-1 rounded-lg border border-[#a89997] bg-[#b9aba9]/40 text-xs font-bold text-[#231c1a] flex items-center gap-1.5">
+              <div className="px-2.5 py-1 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] text-xs font-bold text-[#253341] flex items-center gap-1.5">
                 <span>Saatler: {persona.productivityMetrics.dominantWorkingHours || 'Ölçüm yok'}</span>
               </div>
             </div>
@@ -341,7 +341,7 @@ export const OverviewView: React.FC<Props> = ({
         </div>
 
         {/* Özet ve Çalışma Tarzı */}
-        <p className="text-xs leading-relaxed text-[#4a3e3b] max-w-4xl font-medium">
+        <p className="text-xs leading-relaxed text-[#3E5164] max-w-4xl font-medium">
           {persona?.summary || (isPersonaLoading
             // Kapsam İDDİASI yok: persona istemi telemetri penceresinin tamamını
             // (30 gün) ve seçili depoların mimarisini okur; buraya "son 7 gün"
@@ -355,22 +355,22 @@ export const OverviewView: React.FC<Props> = ({
         {persona && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
             {/* Süper Güçler */}
-            <div className="p-3.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 space-y-2">
-              <span className="text-xs font-bold text-[#231c1a] flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#231c1a]" />
+            <div className="p-3.5 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] space-y-2">
+              <span className="text-xs font-bold text-[#253341] flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#253341]" />
                 <span>Tespit Edilen Güçlü Yönler</span>
               </span>
               {superpowers.length === 0 ? (
                 // Boş bir başlık listesi "bozuk kart" gibi görünür; sunucu artık
                 // uydurma madde üretmediği için bu durum gerçekten oluşabilir.
-                <p className="text-[11px] text-[#4a3e3b] font-medium">
+                <p className="text-[11px] text-[#3E5164] font-medium">
                   Bu kapsamda tespit edilen güçlü yön bulunmuyor.
                 </p>
               ) : (
                 <ul className="space-y-1">
                   {superpowers.map((power, idx) => (
-                    <li key={idx} className="text-xs text-[#4a3e3b] flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
+                    <li key={idx} className="text-xs text-[#3E5164] flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#EC7D55] mt-1.5 shrink-0" />
                       <span className="font-medium">{power}</span>
                     </li>
                   ))}
@@ -379,20 +379,20 @@ export const OverviewView: React.FC<Props> = ({
             </div>
 
             {/* Büyüme & İyileştirme Alanları */}
-            <div className="p-3.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 space-y-2">
-              <span className="text-xs font-bold text-[#231c1a] flex items-center gap-1.5">
-                <Target className="w-3.5 h-3.5 text-[#231c1a]" />
+            <div className="p-3.5 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] space-y-2">
+              <span className="text-xs font-bold text-[#253341] flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-[#253341]" />
                 <span>Mühendislik Tavsiyeleri</span>
               </span>
               {growthAreas.length === 0 ? (
-                <p className="text-[11px] text-[#4a3e3b] font-medium">
+                <p className="text-[11px] text-[#3E5164] font-medium">
                   Bu kapsamda tespit edilen iyileştirme alanı bulunmuyor.
                 </p>
               ) : (
                 <ul className="space-y-1">
                   {growthAreas.map((area, idx) => (
-                    <li key={idx} className="text-xs text-[#4a3e3b] flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#4a3e3b] mt-1.5 shrink-0" />
+                    <li key={idx} className="text-xs text-[#3E5164] flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#3E5164] mt-1.5 shrink-0" />
                       <span className="font-medium">{area}</span>
                     </li>
                   ))}
@@ -415,11 +415,11 @@ export const OverviewView: React.FC<Props> = ({
           description={healthError ?? 'Boyutsal ağırlıklı hesaplama'}
           onActivate={() => onNavigateToTab('hotspots')}
         >
-          <span className="text-2xl font-extrabold text-[#231c1a] tracking-tight">
+          <span className="text-2xl font-extrabold text-[#253341] tracking-tight">
             {formatMeasuredCount(healthScore?.overallScore ?? 0, healthError, healthLoading || !hasHealthData)}
           </span>
-          <span className="text-xs text-[#4a3e3b]">/ 100</span>
-          <span className="ml-auto text-[11px] font-bold px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+          <span className="text-xs text-[#3E5164]">/ 100</span>
+          <span className="ml-auto text-[11px] font-bold px-2 py-0.5 rounded bg-[#F2A488] text-[#253341] border border-[#EC7D55]">
             {healthError
               ? 'Veri Alınamadı'
               : healthLoading
@@ -436,13 +436,13 @@ export const OverviewView: React.FC<Props> = ({
           description={reposError ?? 'Telemetri analizi için seçili'}
           onActivate={() => onNavigateToTab('repositories')}
         >
-          <span className="text-2xl font-extrabold text-[#231c1a] tracking-tight">
+          <span className="text-2xl font-extrabold text-[#253341] tracking-tight">
             {formatMeasuredCount(activeRepos.length, reposError, reposLoading)}
           </span>
           {/* Liste alınamadığında ya da henüz yüklenmediğinde "0 / 0 Aktif"
               yazmak, ölçülemeyen bir durumu "hiç deponuz yok" gibi gösterirdi;
               diğer KPI kartlarıyla aynı biçimde durum açıkça bildirilir. */}
-          <span className="text-xs text-[#4a3e3b]">
+          <span className="text-xs text-[#3E5164]">
             {reposError
               ? 'Veri Alınamadı'
               : reposLoading
@@ -457,11 +457,11 @@ export const OverviewView: React.FC<Props> = ({
           description={hotspotsError ?? 'Yüksek oynaklık ve hata riski'}
           onActivate={() => onNavigateToTab('hotspots')}
         >
-          <span className="text-2xl font-extrabold text-[#231c1a] tracking-tight">
+          <span className="text-2xl font-extrabold text-[#253341] tracking-tight">
             {formatMeasuredCount(hotspots.length, hotspotsError, hotspotsLoading)}
           </span>
           {!hotspotsError && !hotspotsLoading && criticalHotspots.length > 0 && (
-            <span className="text-xs text-[#231c1a] font-bold">
+            <span className="text-xs text-[#AB421C] font-bold">
               ({criticalHotspots.length} kritik)
             </span>
           )}
@@ -473,11 +473,11 @@ export const OverviewView: React.FC<Props> = ({
           description={risksError ?? 'Kural motoru denetimleri'}
           onActivate={() => onNavigateToTab('hotspots')}
         >
-          <span className="text-2xl font-extrabold text-[#231c1a] tracking-tight">
+          <span className="text-2xl font-extrabold text-[#253341] tracking-tight">
             {formatMeasuredCount(risks.length, risksError, risksLoading)}
           </span>
           {!risksError && !risksLoading && criticalRisks.length > 0 && (
-            <span className="text-xs text-[#231c1a] font-bold">
+            <span className="text-xs text-[#AB421C] font-bold">
               ({criticalRisks.length} yüksek)
             </span>
           )}
@@ -487,54 +487,54 @@ export const OverviewView: React.FC<Props> = ({
       {/* Ana Satır: Günün Bülteni & 7 Günlük Hız Grafiği */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Günün Mühendislik Bülteni */}
-        <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-3 shadow-xs flex flex-col justify-between">
+        <div className="p-5 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] space-y-3 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between border-b border-[#a89997] pb-3">
+            <div className="flex items-center justify-between border-b border-[#BCC7D2] pb-3">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#231c1a]" />
-                <h3 className="text-xs font-bold text-[#231c1a]">
+                <Sparkles className="w-4 h-4 text-[#253341]" />
+                <h3 className="text-xs font-bold text-[#253341]">
                   Günün Mühendislik Bülteni
                 </h3>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#DBE6DD] text-[#253341] border border-[#BCC7D2]">
                 AI Sentezi
               </span>
             </div>
 
             <div className="space-y-2.5 mt-3 max-h-[350px] overflow-y-auto pr-1">
               {dailyBriefLoading ? (
-                <p className="text-xs text-[#4a3e3b] py-6 text-center">
+                <p className="text-xs text-[#3E5164] py-6 text-center">
                   Bülten maddeleri hazırlanıyor...
                 </p>
               ) : dailyBriefError ? (
-                <p className="text-xs text-[#231c1a] py-4">
+                <p className="text-xs text-[#AB421C] font-medium py-4">
                   Bülten alınamadı: {dailyBriefError}
                 </p>
               ) : dailyBrief.length === 0 ? (
-                <p className="text-xs text-[#4a3e3b] py-6 text-center">
+                <p className="text-xs text-[#3E5164] py-6 text-center">
                   Bu dönem için gösterilecek bülten maddesi bulunmuyor.
                 </p>
               ) : (
                 dailyBrief.map((item) => (
                   <div
                     key={item.id}
-                    className="p-3 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 hover:bg-[#b9aba9]/50 transition-colors space-y-1.5 shadow-xs"
+                    className="p-3 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] hover:bg-[#DBE6DD] transition-colors space-y-1.5 shadow-xs"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] shrink-0" />
-                        <span className="text-xs font-bold text-[#231c1a] truncate">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#EC7D55] shrink-0" />
+                        <span className="text-xs font-bold text-[#253341] truncate">
                           {item.title}
                         </span>
                       </div>
-                      <span className="text-[10px] font-bold text-[#4a3e3b] shrink-0">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${getSeverityBadgeClass(item.priority)}`}>
                         {PRIORITY_TR_MAP[item.priority] || item.priority}
                       </span>
                     </div>
-                    <p className="text-xs text-[#4a3e3b] leading-relaxed line-clamp-2">
+                    <p className="text-xs text-[#3E5164] leading-relaxed line-clamp-2">
                       {item.description}
                     </p>
-                    <div className="flex items-center justify-between pt-1 text-[11px] text-[#4a3e3b]">
+                    <div className="flex items-center justify-between pt-1 text-[11px] text-[#3E5164]">
                       <span className="truncate">{item.relatedRepo || 'Genel Platform'}</span>
                       <button
                         onClick={() =>
@@ -555,7 +555,7 @@ export const OverviewView: React.FC<Props> = ({
                               : [],
                           })
                         }
-                        className="flex items-center gap-1 text-xs font-bold text-[#231c1a] hover:underline transition-colors cursor-pointer shrink-0 ml-2"
+                        className="flex items-center gap-1 text-xs font-bold text-[#AB421C] hover:text-[#253341] hover:underline transition-colors cursor-pointer shrink-0 ml-2"
                       >
                         <span>Detay</span>
                         <ArrowRight className="w-3 h-3" />
@@ -569,11 +569,11 @@ export const OverviewView: React.FC<Props> = ({
         </div>
 
         {/* Haftalık Hız Grafiği (pencere: ACTIVITY_WINDOW_DAYS) */}
-        <div className="lg:col-span-2 p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-[#a89997] pb-3">
+        <div className="lg:col-span-2 p-5 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] space-y-4 shadow-xs">
+          <div className="flex items-center justify-between border-b border-[#BCC7D2] pb-3">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#231c1a]" />
-              <h3 className="text-xs font-bold text-[#231c1a]">
+              <TrendingUp className="w-4 h-4 text-[#253341]" />
+              <h3 className="text-xs font-bold text-[#253341]">
                 Son {ACTIVITY_WINDOW_DAYS} Günlük Aktivite & Hız
               </h3>
             </div>
@@ -581,11 +581,11 @@ export const OverviewView: React.FC<Props> = ({
               {/* Lejant renkleri grafikle tek kaynaktan (CHART_THEME) gelir: sabit
                   bir sınıf, seri rengi değiştiğinde lejantı sessizce ayrıştırır
                   ve okur hangi noktanın hangi seri olduğunu eşleyemez. */}
-              <div className="flex items-center gap-1.5 text-[#4a3e3b] font-bold">
+              <div className="flex items-center gap-1.5 text-[#3E5164] font-bold">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_THEME.seriesPrimaryFill }} />
                 <span>Commit Hızı</span>
               </div>
-              <div className="flex items-center gap-1.5 text-[#4a3e3b] font-bold">
+              <div className="flex items-center gap-1.5 text-[#3E5164] font-bold">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_THEME.seriesSecondaryFill }} />
                 <span>Hata Düzeltmeleri</span>
               </div>
@@ -594,22 +594,22 @@ export const OverviewView: React.FC<Props> = ({
 
           <div className="h-[300px] w-full pt-2">
             {activityLoading ? (
-              <div className="h-full flex items-center justify-center text-xs text-[#4a3e3b]">
+              <div className="h-full flex items-center justify-center text-xs text-[#3E5164]">
                 Aktivite verisi yükleniyor...
               </div>
             ) : activityError ? (
-              <div className="h-full flex items-center justify-center text-xs text-[#231c1a] text-center">
+              <div className="h-full flex items-center justify-center text-xs text-[#AB421C] font-medium text-center">
                 Aktivite verisi alınamadı: {activityError}
               </div>
             ) : chartData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-[#4a3e3b] text-center">
+              <div className="h-full flex items-center justify-center text-xs text-[#3E5164] text-center">
                 Son {ACTIVITY_WINDOW_DAYS} günde gösterilecek aktivite bulunmuyor.
               </div>
             ) : (
               <ChartErrorBoundary>
                 <React.Suspense
                   fallback={
-                    <div className="h-full flex items-center justify-center text-xs text-[#4a3e3b] animate-pulse">
+                    <div className="h-full flex items-center justify-center text-xs text-[#3E5164] animate-pulse">
                       Grafik bileşeni yükleniyor...
                     </div>
                   }
@@ -625,14 +625,14 @@ export const OverviewView: React.FC<Props> = ({
       {/* İkinci Satır: CI/CD Pipeline & Teknoloji Yığını (Languages) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* En Yüksek Etkili Odak Depolar Kartı */}
-        <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-3.5 shadow-xs flex flex-col justify-between">
+        <div className="p-5 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] space-y-3.5 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between border-b border-[#a89997] pb-3">
+            <div className="flex items-center justify-between border-b border-[#BCC7D2] pb-3">
               <div className="flex items-center gap-2">
-                <FolderGit2 className="w-4 h-4 text-[#231c1a]" />
-                <h3 className="text-xs font-bold text-[#231c1a]">En Yüksek Etkili Odak Depolar</h3>
+                <FolderGit2 className="w-4 h-4 text-[#253341]" />
+                <h3 className="text-xs font-bold text-[#253341]">En Yüksek Etkili Odak Depolar</h3>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#DBE6DD] text-[#253341] border border-[#BCC7D2]">
                 Aktif Çalışma Alanları
               </span>
             </div>
@@ -642,7 +642,7 @@ export const OverviewView: React.FC<Props> = ({
                   başarısızsa ya da ilk yükleme sürüyorsa kullanıcıya hesabının
                   boş olduğu izlenimi verilmez (bkz. formatMeasuredCount). */}
               {topImpactRepos.length === 0 ? (
-                <p className="text-xs text-[#4a3e3b] text-center py-6">
+                <p className="text-xs text-[#3E5164] text-center py-6">
                   {reposError
                     ? 'Depo telemetrisi alınamadığı için odak depolar hesaplanamadı.'
                     : reposLoading
@@ -655,31 +655,32 @@ export const OverviewView: React.FC<Props> = ({
                     key={repo.id}
                     type="button"
                     onClick={() => onSelectRepo(repo)}
-                    className="w-full text-left p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/25 hover:bg-[#b9aba9]/45 transition-all flex items-center justify-between gap-3 cursor-pointer group shadow-2xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#231c1a]"
+                    className="w-full text-left p-2.5 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] hover:bg-[#DBE6DD] transition-colors flex items-center justify-between gap-3 cursor-pointer group shadow-2xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#253341]"
                     title="Bu depoyu Kensai AI ile analiz et"
                   >
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-[#231c1a] group-hover:underline truncate">
+                        <span className="text-xs font-bold text-[#253341] group-hover:underline truncate">
                           {repo.name}
                         </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 font-bold">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#DBE6DD] text-[#253341] border border-[#BCC7D2] font-bold">
                           {repo.language || 'Kod'}
                         </span>
                         {repo.stargazers_count > 0 && (
-                          <span className="text-[10px] font-bold text-[#231c1a] flex items-center gap-0.5">
-                            ⭐ {repo.stargazers_count}
+                          <span className="text-[10px] font-bold text-[#253341] flex items-center gap-0.5">
+                            <Star className="w-3 h-3 text-[#AB421C]" aria-hidden="true" />
+                            <span>{repo.stargazers_count}</span>
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-[#4a3e3b] truncate font-medium max-w-xs">
+                      <p className="text-[11px] text-[#3E5164] truncate font-medium max-w-xs">
                         {repo.description || 'Proje açıklaması girilmemiş.'}
                       </p>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className="text-[10px] block text-[#4a3e3b] font-bold">Son Değişiklik</span>
-                      <span className="text-xs font-bold text-[#231c1a]">
+                      <span className="text-[10px] block text-[#3E5164] font-bold">Son Değişiklik</span>
+                      <span className="text-xs font-bold text-[#253341]">
                         {formatDate(repo.pushed_at || repo.updated_at)}
                       </span>
                     </div>
@@ -689,8 +690,8 @@ export const OverviewView: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-[#a89997] flex items-center justify-between">
-            <span className="text-[11px] text-[#4a3e3b] font-medium">
+          <div className="pt-2 border-t border-[#BCC7D2] flex items-center justify-between">
+            <span className="text-[11px] text-[#3E5164] font-medium">
               {/* Hata önce gelir: başarısız bir istek, başka bir sorgu hâlâ
                   beklerken "yükleniyor" diye gösterilirse kullanıcı hiç
                   gelmeyecek bir sonucu bekler (aynı sıra ölçüm rozetlerinde de
@@ -703,7 +704,7 @@ export const OverviewView: React.FC<Props> = ({
             </span>
             <button
               onClick={() => onNavigateToTab('repositories')}
-              className="text-xs font-bold text-[#231c1a] hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-[#AB421C] hover:text-[#253341] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
             >
               <span>Tüm Depolar</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -712,13 +713,13 @@ export const OverviewView: React.FC<Props> = ({
         </div>
 
         {/* Teknoloji Yığını & Çoklu Dil Dağılımı */}
-        <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-3.5 shadow-xs">
-          <div className="flex items-center justify-between border-b border-[#a89997] pb-3">
+        <div className="p-5 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] space-y-3.5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-[#BCC7D2] pb-3">
             <div className="flex items-center gap-2">
-              <Code2 className="w-4 h-4 text-[#231c1a]" />
-              <h3 className="text-xs font-bold text-[#231c1a]">Doğrulanmış Teknoloji Yığını</h3>
+              <Code2 className="w-4 h-4 text-[#253341]" />
+              <h3 className="text-xs font-bold text-[#253341]">Doğrulanmış Teknoloji Yığını</h3>
             </div>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#DBE6DD] text-[#253341] border border-[#BCC7D2]">
               Bayt Tabanlı Analiz
             </span>
           </div>
@@ -729,7 +730,7 @@ export const OverviewView: React.FC<Props> = ({
                 bir sonucu bekler. Durum, kartın altbilgisiyle aynı sırayla
                 (hata → yükleniyor → boş) bildirilir. */}
             {topLanguages.length === 0 ? (
-              <p className="text-xs text-[#4a3e3b] text-center py-4">
+              <p className="text-xs text-[#3E5164] text-center py-4">
                 {reposError
                   ? 'Dil telemetrisi alınamadı.'
                   : reposLoading
@@ -739,14 +740,17 @@ export const OverviewView: React.FC<Props> = ({
             ) : (
               topLanguages.map((lang, idx) => (
                 <div key={idx} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-bold text-[#231c1a]">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#253341]">
                     <span>{lang.name}</span>
-                    <span className="text-[#4a3e3b] font-medium">%{lang.percentage} ({formatTrNumber(lang.sizeKb)} KB)</span>
+                    <span className="text-[#3E5164] font-medium">%{lang.percentage} ({formatTrNumber(lang.sizeKb)} KB)</span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-[#b9aba9]/40 overflow-hidden border border-[#231c1a]/10">
+                  <div className="w-full h-1.5 rounded-full bg-[#EDF3EE] overflow-hidden border border-[#BCC7D2]">
                     <div
-                      className="h-full bg-[#f9b88e] rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, Math.max(4, lang.percentage))}%` }}
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, Math.max(4, lang.percentage))}%`,
+                        backgroundColor: SERIES_PALETTE[idx % SERIES_PALETTE.length],
+                      }}
                     />
                   </div>
                 </div>
@@ -757,14 +761,14 @@ export const OverviewView: React.FC<Props> = ({
       </div>
 
       {/* Alt Satır: Depo Bazlı Sağlık Matrisi */}
-      <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] space-y-4 shadow-xs">
-        <div className="flex items-center justify-between border-b border-[#a89997] pb-3">
-          <h3 className="text-xs font-bold text-[#231c1a]">
+      <div className="p-5 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] space-y-4 shadow-xs">
+        <div className="flex items-center justify-between border-b border-[#BCC7D2] pb-3">
+          <h3 className="text-xs font-bold text-[#253341]">
             Depo Bazlı Sağlık ve Risk Matrisi
           </h3>
           <button
             onClick={() => onNavigateToTab('repositories')}
-            className="text-xs font-bold text-[#231c1a] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+            className="text-xs font-bold text-[#AB421C] hover:text-[#253341] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
           >
             <span>Tüm Depoları Gör</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -777,26 +781,26 @@ export const OverviewView: React.FC<Props> = ({
               key={repo.id}
               type="button"
               onClick={() => onSelectRepo(repo)}
-              className="w-full text-left p-3.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 hover:bg-[#b9aba9]/50 transition-all cursor-pointer shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#231c1a]"
+              className="w-full text-left p-3.5 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] hover:bg-[#DBE6DD] transition-colors cursor-pointer shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#253341]"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#231c1a] truncate">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-[#253341] truncate">
                   {repo.name}
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#DBE6DD] text-[#253341] border border-[#BCC7D2] shrink-0">
                   {repo.language || 'Code'}
                 </span>
               </div>
-              <p className="text-xs mt-1 text-[#4a3e3b] line-clamp-2">
+              <p className="text-xs mt-1 text-[#3E5164] line-clamp-2">
                 {repo.description || 'Aktif GitHub deposu'}
               </p>
-              <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#a89997] text-[11px] text-[#4a3e3b]">
-                <span className="flex items-center gap-1 font-medium text-[#4a3e3b]">
-                  <Star className="w-3 h-3 text-[#231c1a]" />
+              <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#BCC7D2] text-[11px] text-[#3E5164]">
+                <span className="flex items-center gap-1 font-medium text-[#3E5164]">
+                  <Star className="w-3 h-3 text-[#253341]" />
                   <span>{repo.stargazers_count || 0} Star</span>
                 </span>
-                <span className="flex items-center gap-1 font-bold text-[#231c1a]">
-                  <GitFork className="w-3 h-3 text-[#231c1a]" />
+                <span className="flex items-center gap-1 font-bold text-[#253341]">
+                  <GitFork className="w-3 h-3 text-[#253341]" />
                   <span>{repo.forks_count || 0} Fork</span>
                 </span>
               </div>
@@ -807,7 +811,7 @@ export const OverviewView: React.FC<Props> = ({
               sürerken kullanıcıyı olmayan bir eksiği gidermeye göndermek
               ölçümsüz durumu yanlış teşhis ettirirdi. */}
           {repositories.length === 0 && (
-            <p className="col-span-full text-xs text-[#4a3e3b] text-center py-6">
+            <p className="col-span-full text-xs text-[#3E5164] text-center py-6">
               {reposError
                 ? 'Depo telemetrisi alınamadı; sağlık matrisi hesaplanamadı.'
                 : reposLoading

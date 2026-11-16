@@ -19,6 +19,7 @@ import { Repository, GitHubUser, RepoAiReview } from '../types.js';
 import { formatDate, formatMeasuredCount } from '../utils/formatters.js';
 import { useRepoReview, REPO_REVIEW_MUTATION_KEY } from '../hooks/useMetrics.js';
 import { useModalA11y } from '../hooks/useModalA11y.js';
+import { getSeverityBadgeClass } from '../theme.js';
 import { useIsMutating } from '@tanstack/react-query';
 
 interface Props {
@@ -178,34 +179,34 @@ export const RepositoriesView: React.FC<Props> = ({
   );
 
   return (
-    <div id="repositories-view" className="space-y-6 font-sans text-[#231c1a]">
+    <div id="repositories-view" className="space-y-6 font-sans text-[#253341]">
       {/* Üst Bilgi ve Kullanıcı Kartı */}
-      <div className="p-5 rounded-xl border border-[#a89997] bg-[#cdc1b5] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+      <div className="p-5 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
         <div className="flex items-center gap-4">
           {user?.avatar_url ? (
             <img
               src={user.avatar_url}
               alt={user.name}
-              className="w-12 h-12 rounded-xl border border-[#a89997] object-cover shadow-xs"
+              className="w-12 h-12 rounded-xl border border-[#BCC7D2] object-cover shadow-xs"
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-12 h-12 rounded-xl bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 flex items-center justify-center font-bold text-sm shadow-xs">
+            <div className="w-12 h-12 rounded-xl bg-[#EC7D55] text-[#253341] border border-[#AB421C] flex items-center justify-center font-bold text-sm shadow-xs">
               GH
             </div>
           )}
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-[#231c1a] tracking-tight">
+              <h2 className="text-base font-bold text-[#253341] tracking-tight">
                 {user?.name || user?.login || 'Kişisel GitHub Hesabı'}
               </h2>
               {user?.login && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 font-bold">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#F2A488] text-[#253341] border border-[#EC7D55] font-bold">
                   @{user.login}
                 </span>
               )}
             </div>
-            <p className="text-xs text-[#4a3e3b] mt-0.5 font-medium">
+            <p className="text-xs text-[#3E5164] mt-0.5 font-medium">
               Yalnızca size ait kişisel GitHub depoları analiz edilmektedir.
             </p>
           </div>
@@ -213,13 +214,13 @@ export const RepositoriesView: React.FC<Props> = ({
 
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <span className="text-xs text-[#4a3e3b] block font-bold">Toplam Depo</span>
-            <span className="text-sm font-bold text-[#231c1a]">{measuredCount(safeRepos.length)}</span>
+            <span className="text-xs text-[#3E5164] block font-bold">Toplam Depo</span>
+            <span className="text-sm font-bold text-[#253341]">{measuredCount(safeRepos.length)}</span>
           </div>
-          <div className="w-px h-6 bg-[#a89997]" />
+          <div className="w-px h-6 bg-[#BCC7D2]" />
           <div className="text-right">
-            <span className="text-xs text-[#4a3e3b] block font-bold">Analiz Edilen</span>
-            <span className="text-sm font-bold text-[#231c1a]">
+            <span className="text-xs text-[#3E5164] block font-bold">Analiz Edilen</span>
+            <span className="text-sm font-bold text-[#253341]">
               {measuredCount(selectedReposCount)}
             </span>
           </div>
@@ -230,13 +231,13 @@ export const RepositoriesView: React.FC<Props> = ({
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Arama Kutusu */}
         <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#4a3e3b]" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#3E5164]" />
           <input
             type="text"
             placeholder="Depo adı veya açıklamaya göre ara..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#a89997] bg-[#b9aba9]/35 text-xs text-[#231c1a] placeholder-[#4a3e3b] focus:outline-none focus:border-[#f9b88e] transition-colors"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#BCC7D2] bg-[#F5F9F5] text-xs text-[#253341] placeholder-[#3E5164] focus:outline-none focus:border-[#EC7D55] focus:ring-1 focus:ring-[#EC7D55] transition-colors"
           />
         </div>
 
@@ -248,9 +249,9 @@ export const RepositoriesView: React.FC<Props> = ({
             type="button"
             aria-pressed={filterLang === 'ALL'}
             onClick={() => setFilterLang('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${filterLang === 'ALL'
-              ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
-              : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${filterLang === 'ALL'
+              ? 'bg-[#EC7D55] text-[#253341] border border-[#AB421C] ring-1 ring-[#EC7D55] shadow-xs'
+              : 'border border-[#BCC7D2] bg-[#EDF3EE] text-[#3E5164] hover:text-[#253341] hover:bg-[#DBE6DD]'
               }`}
           >
             Tümü ({measuredCount(safeRepos.length)})
@@ -261,9 +262,9 @@ export const RepositoriesView: React.FC<Props> = ({
               type="button"
               aria-pressed={filterLang === lang}
               onClick={() => setFilterLang(lang)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${filterLang === lang
-                ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
-                : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${filterLang === lang
+                ? 'bg-[#EC7D55] text-[#253341] border border-[#AB421C] ring-1 ring-[#EC7D55] shadow-xs'
+                : 'border border-[#BCC7D2] bg-[#EDF3EE] text-[#3E5164] hover:text-[#253341] hover:bg-[#DBE6DD]'
                 }`}
             >
               {lang}
@@ -275,7 +276,7 @@ export const RepositoriesView: React.FC<Props> = ({
       {/* Depolar Listesi */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredRepos.length === 0 ? (
-          <div className="col-span-full p-8 rounded-xl border border-[#a89997] bg-[#cdc1b5] text-center text-xs text-[#4a3e3b]">
+          <div className="col-span-full p-8 rounded-xl border border-[#BCC7D2] bg-[#DCE3EA] text-center text-xs text-[#3E5164]">
             {/* Başarısız bir istek "depo yok" olarak gösterilmez: liste hiç
                 gelmediyse bu bir ölçümsüz durumdur, hesabın deposuz olduğu
                 değil (bkz. HotspotsView/OverviewView'daki aynı ayrım). Süren
@@ -288,20 +289,20 @@ export const RepositoriesView: React.FC<Props> = ({
             return (
               <div
                 key={repo.id}
-                className={`p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 shadow-xs ${isSelected
-                  ? 'border-[#231c1a]/30 bg-[#cdc1b5]'
-                  : 'border-[#a89997] bg-[#cdc1b5]/80 hover:bg-[#cdc1b5]'
+                className={`p-4 rounded-xl border transition-colors flex flex-col justify-between gap-3 shadow-xs ${isSelected
+                  ? 'border-[#EC7D55] bg-[#DCE3EA]'
+                  : 'border-[#BCC7D2] bg-[#DCE3EA] hover:bg-[#DBE6DD]'
                   }`}
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
                       {repo.is_private ? (
-                        <Lock className="w-3.5 h-3.5 text-[#4a3e3b] shrink-0" />
+                        <Lock className="w-3.5 h-3.5 text-[#3E5164] shrink-0" />
                       ) : (
-                        <Globe className="w-3.5 h-3.5 text-[#4a3e3b] shrink-0" />
+                        <Globe className="w-3.5 h-3.5 text-[#3E5164] shrink-0" />
                       )}
-                      <span className="font-bold text-xs text-[#231c1a] truncate">
+                      <span className="font-bold text-xs text-[#253341] truncate">
                         {repo.name}
                       </span>
                     </div>
@@ -310,14 +311,14 @@ export const RepositoriesView: React.FC<Props> = ({
                       href={repo.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1 rounded text-[#4a3e3b] hover:text-[#231c1a] transition-colors shrink-0"
+                      className="p-1 rounded text-[#AB421C] hover:text-[#253341] transition-colors shrink-0"
                       title="GitHub'da aç"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>
 
-                  <p className="text-xs text-[#4a3e3b] line-clamp-2 leading-relaxed font-medium">
+                  <p className="text-xs text-[#3E5164] line-clamp-2 leading-relaxed font-medium">
                     {repo.description || 'Açıklama bulunmuyor.'}
                   </p>
 
@@ -325,11 +326,11 @@ export const RepositoriesView: React.FC<Props> = ({
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     {repo.latest_ci_run ? (
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded border border-[#231c1a]/15 flex items-center gap-1 ${repo.latest_ci_run.conclusion === 'success'
-                          ? 'bg-[#f9b88e] text-[#231c1a]'
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${repo.latest_ci_run.conclusion === 'success'
+                          ? 'bg-[#DBE6DD] text-[#253341] border-[#BCC7D2]'
                           : repo.latest_ci_run.conclusion === 'failure'
-                            ? 'bg-[#231c1a] text-[#f9b88e]'
-                            : 'bg-[#b9aba9]/50 text-[#231c1a]'
+                            ? 'bg-[#AB421C] text-[#F5F9F5] border-[#AB421C]'
+                            : 'bg-[#F2A488] text-[#253341] border-[#EC7D55]'
                           }`}
                         title={`En son CI workflow: ${repo.latest_ci_run.name} (${repo.latest_ci_run.conclusion || repo.latest_ci_run.status})`}
                       >
@@ -340,36 +341,36 @@ export const RepositoriesView: React.FC<Props> = ({
 
                     {repo.latest_release ? (
                       <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded border border-[#231c1a]/15 bg-[#b9aba9]/40 text-[#231c1a] flex items-center gap-1"
+                        className="text-[10px] font-bold px-2 py-0.5 rounded border border-[#BCC7D2] bg-[#EDF3EE] text-[#253341] flex items-center gap-1"
                         title={`Son yayınlanan sürüm: ${repo.latest_release.tag_name} (${repo.latest_release.published_at.slice(0, 10)})`}
                       >
-                        <Tag className="w-3 h-3 shrink-0 text-[#231c1a]" />
+                        <Tag className="w-3 h-3 shrink-0 text-[#253341]" />
                         <span>{repo.latest_release.tag_name}</span>
                       </span>
                     ) : null}
 
                     {repo.branches_count && repo.branches_count > 1 ? (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-[#231c1a]/15 bg-[#b9aba9]/30 text-[#4a3e3b]">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-[#BCC7D2] bg-[#EDF3EE] text-[#3E5164]">
                         {repo.branches_count} dal
                       </span>
                     ) : null}
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-2 border-t border-[#a89997]">
-                  <div className="flex items-center justify-between text-[11px] text-[#4a3e3b]">
+                <div className="space-y-3 pt-2 border-t border-[#BCC7D2]">
+                  <div className="flex items-center justify-between text-[11px] text-[#3E5164]">
                     <span className="font-bold truncate max-w-[140px]" title={repo.languages ? Object.keys(repo.languages).join(', ') : repo.language}>
                       {repo.language || 'Belirtilmemiş'}
                       {repo.languages && Object.keys(repo.languages).length > 1 ? ` (+${Object.keys(repo.languages).length - 1})` : ''}
                     </span>
                     <span className="flex items-center gap-2">
                       <span className="inline-flex items-center gap-1 font-medium">
-                        <Star className="w-3 h-3 text-[#231c1a]" />
+                        <Star className="w-3 h-3 text-[#253341]" />
                         <span>{repo.stargazers_count || 0} Star</span>
                       </span>
                       <span>·</span>
                       <span className="inline-flex items-center gap-1 font-medium">
-                        <GitFork className="w-3 h-3 text-[#231c1a]" />
+                        <GitFork className="w-3 h-3 text-[#253341]" />
                         <span>{repo.forks_count || 0} Fork</span>
                       </span>
                     </span>
@@ -380,9 +381,9 @@ export const RepositoriesView: React.FC<Props> = ({
                       type="button"
                       onClick={() => onToggleRepo(String(repo.id))}
                       disabled={pendingRepoId === String(repo.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait ${isSelected
-                        ? 'bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/20 shadow-xs'
-                        : 'border border-[#a89997] bg-[#b9aba9]/35 text-[#4a3e3b] hover:text-[#231c1a]'
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait ${isSelected
+                        ? 'bg-[#F2A488] text-[#253341] border border-[#EC7D55] hover:bg-[#EC7D55] shadow-xs'
+                        : 'border border-[#BCC7D2] bg-[#EDF3EE] text-[#3E5164] hover:text-[#253341] hover:bg-[#DBE6DD]'
                         }`}
                     >
                       {pendingRepoId === String(repo.id)
@@ -396,21 +397,21 @@ export const RepositoriesView: React.FC<Props> = ({
                       <button
                         onClick={() => handleTriggerReview(repo)}
                         disabled={isReviewInFlight}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 hover:brightness-105 transition-all cursor-pointer shadow-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#EC7D55] text-[#253341] border border-[#AB421C] hover:bg-[#AB421C] hover:text-[#F5F9F5] transition-colors cursor-pointer shadow-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                         title={
                           isReviewInFlight
                             ? 'Bir inceleme sürüyor; tamamlanınca yeniden deneyebilirsiniz'
                             : 'Gemini ile kapsamlı depo incelemesi'
                         }
                       >
-                        <Sparkles className="w-3 h-3 text-[#231c1a]" />
+                        <Sparkles className="w-3 h-3" />
                         <span>İncele</span>
                       </button>
 
                       <button
                         onClick={() => onAskAboutRepo(repo.name)}
                         title="Depo hakkında yapay zeka analistine soru sor"
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer shadow-xs"
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-[#BCC7D2] bg-[#EDF3EE] text-[#253341] hover:bg-[#DBE6DD] transition-colors cursor-pointer shadow-xs"
                       >
                         Kensai
                       </button>
@@ -431,20 +432,20 @@ export const RepositoriesView: React.FC<Props> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="repo-review-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto font-sans focus:outline-none"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#253341]/45 backdrop-blur-sm overflow-y-auto font-sans focus:outline-none"
         >
-          <div className="w-full max-w-2xl p-6 rounded-2xl border border-[#a89997] bg-[#cdc1b5] space-y-5 shadow-2xl animate-in zoom-in-95 my-8 text-[#231c1a]">
+          <div className="w-full max-w-2xl p-6 rounded-2xl border border-[#BCC7D2] bg-[#DCE3EA] space-y-5 shadow-2xl animate-in zoom-in-95 my-8 text-[#253341]">
             {/* Modal Başlığı */}
-            <div className="flex items-center justify-between border-b border-[#a89997] pb-4">
+            <div className="flex items-center justify-between border-b border-[#BCC7D2] pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[#f9b88e] border border-[#231c1a]/15 text-[#231c1a] shadow-xs">
+                <div className="p-2 rounded-lg bg-[#EC7D55] border border-[#AB421C] text-[#253341] shadow-xs">
                   <Brain className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 id="repo-review-title" className="text-sm font-bold text-[#231c1a]">
+                  <h3 id="repo-review-title" className="text-sm font-bold text-[#253341]">
                     {activeRepoForReview.name} — Kensai Mimari İnceleme
                   </h3>
-                  <span className="text-[11px] text-[#4a3e3b] block mt-0.5 font-medium">
+                  <span className="text-[11px] text-[#3E5164] block mt-0.5 font-medium">
                     Otomatik kod kalitesi ve sağlık değerlendirmesi
                   </span>
                 </div>
@@ -453,7 +454,7 @@ export const RepositoriesView: React.FC<Props> = ({
               <button
                 onClick={closeReviewModal}
                 aria-label="İnceleme penceresini kapat"
-                className="p-1.5 rounded-lg border border-[#231c1a]/15 bg-[#f9b88e] text-[#231c1a] hover:brightness-105 cursor-pointer transition-all"
+                className="p-1.5 rounded-lg border border-[#AB421C] bg-[#EC7D55] text-[#253341] hover:bg-[#AB421C] hover:text-[#F5F9F5] cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>
@@ -462,13 +463,13 @@ export const RepositoriesView: React.FC<Props> = ({
             {/* Yükleniyor Durumu */}
             {repoReviewMutation.isPending && !reviewResult && (
               <div className="py-12 text-center space-y-3">
-                <div className="inline-block animate-spin p-3 rounded-full border-2 border-dashed border-[#231c1a] text-[#231c1a]">
+                <div className="inline-block animate-spin p-3 rounded-full border-2 border-dashed border-[#253341] text-[#253341]">
                   <Sparkles className="w-6 h-6" />
                 </div>
-                <p className="text-sm font-bold text-[#231c1a]">
+                <p className="text-sm font-bold text-[#253341]">
                   KENSAI depo telemetrisini ve commit geçmişini inceliyor...
                 </p>
-                <p className="text-xs text-[#4a3e3b]">
+                <p className="text-xs text-[#3E5164]">
                   Mimari güçlü yönler, teknik borçlar ve önceliklendirilmiş aksiyon planı sentezleniyor
                 </p>
               </div>
@@ -477,17 +478,17 @@ export const RepositoriesView: React.FC<Props> = ({
             {/* Hata Durumu */}
             {repoReviewMutation.isError && !reviewResult && (
               <div className="py-8 text-center space-y-3">
-                <div className="p-3 rounded-full bg-[#f9b88e]/40 border border-[#231c1a]/20 inline-flex text-[#231c1a]">
+                <div className="p-3 rounded-full bg-[#AB421C] border border-[#AB421C] inline-flex text-[#F5F9F5]">
                   <AlertCircle className="w-6 h-6" />
                 </div>
-                <p className="text-xs font-bold text-[#231c1a]">
+                <p className="text-xs font-bold text-[#AB421C]">
                   {repoReviewMutation.error?.message || 'İnceleme raporu alınırken bir hata oluştu.'}
                 </p>
                 <div className="flex justify-center gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => handleTriggerReview(activeRepoForReview, lastReviewForceRef.current)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 hover:brightness-105 transition-all cursor-pointer shadow-xs"
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#EC7D55] text-[#253341] border border-[#AB421C] hover:bg-[#AB421C] hover:text-[#F5F9F5] transition-colors cursor-pointer shadow-xs"
                   >
                     Tekrar Dene
                   </button>
@@ -497,7 +498,7 @@ export const RepositoriesView: React.FC<Props> = ({
                       setActiveRepoForReview(null);
                       setReviewResult(null);
                     }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[#BCC7D2] bg-[#EDF3EE] text-[#253341] hover:bg-[#DBE6DD] transition-colors cursor-pointer"
                   >
                     Kapat
                   </button>
@@ -508,25 +509,25 @@ export const RepositoriesView: React.FC<Props> = ({
             {reviewResult && (
               <div className="space-y-4 text-xs leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
                 {/* Kalite Skoru ve Mimari Değerlendirme Özeti */}
-                <div className="p-4 rounded-xl border border-[#a89997] bg-[#b9aba9]/35 space-y-2 shadow-xs">
+                <div className="p-4 rounded-xl border border-[#BCC7D2] bg-[#EDF3EE] space-y-2 shadow-xs">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15 inline-block">
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[#DBE6DD] text-[#253341] border border-[#BCC7D2] inline-block">
                       Mimari Özet
                     </span>
                     {reviewResult.codeQualityScore !== undefined && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border border-[#231c1a]/15 bg-[#f9b88e] text-[#231c1a] shadow-xs">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border border-[#EC7D55] bg-[#F2A488] text-[#253341] shadow-xs">
                         Kalite Skoru: {reviewResult.codeQualityScore} / 100
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#231c1a] font-medium leading-relaxed">
+                  <p className="text-xs text-[#253341] font-medium leading-relaxed">
                     {reviewResult.architectureOverview}
                   </p>
                   {/* Raporun yaşı gösterilir: sunucu taze incelemeyi 7 güne kadar
                       önbellekten servis eder (bkz. FirestoreService.REVIEW_TTL_MS),
                       tarih yazılmazsa günler önce üretilmiş bir rapor güncel
                       sanılırdı. Yeniden üretme yolu da bu satırda anılır. */}
-                  <p className="text-[10px] text-[#4a3e3b] font-medium pt-1 border-t border-[#a89997]/60">
+                  <p className="text-[10px] text-[#3E5164] font-medium pt-1 border-t border-[#BCC7D2]">
                     İnceleme tarihi: {formatDate(reviewResult.reviewedAt) || 'bilinmiyor'} · Rapor 7 gün boyunca önbellekten servis edilir; güncel telemetriyle yeniden üretmek için "Yeniden Üret" düğmesini kullanın.
                   </p>
                 </div>
@@ -534,17 +535,17 @@ export const RepositoriesView: React.FC<Props> = ({
                 {/* Güçlü Yönler */}
                 {Array.isArray(reviewResult.strengths) && reviewResult.strengths.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                    <h4 className="font-bold text-xs text-[#253341] uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#253341]" aria-hidden="true" />
                       <span>Güçlü Yönler</span>
                     </h4>
                     <ul className="space-y-1.5">
                       {reviewResult.strengths.map((str: string, idx: number) => (
                         <li
                           key={idx}
-                          className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
+                          className="p-2.5 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] text-[#3E5164] flex items-start gap-2 font-medium"
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#253341] mt-1.5 shrink-0" />
                           <span>{str}</span>
                         </li>
                       ))}
@@ -555,17 +556,17 @@ export const RepositoriesView: React.FC<Props> = ({
                 {/* Kritik İyileştirme Alanları & Teknik Borçlar */}
                 {reviewResult.technicalDebts && reviewResult.technicalDebts.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                    <h4 className="font-bold text-xs text-[#253341] uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-[#AB421C]" aria-hidden="true" />
                       <span>Teknik Borçlar & Zayıf Yönler</span>
                     </h4>
                     <ul className="space-y-1.5">
                       {reviewResult.technicalDebts.map((debt: string, idx: number) => (
                         <li
                           key={idx}
-                          className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
+                          className="p-2.5 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] text-[#3E5164] flex items-start gap-2 font-medium"
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#4a3e3b] mt-1.5 shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#AB421C] mt-1.5 shrink-0" />
                           <span>{debt}</span>
                         </li>
                       ))}
@@ -576,17 +577,17 @@ export const RepositoriesView: React.FC<Props> = ({
                 {/* Güvenlik Gözlemleri */}
                 {Array.isArray(reviewResult.securityObservations) && reviewResult.securityObservations.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                    <h4 className="font-bold text-xs text-[#253341] uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#253341]" aria-hidden="true" />
                       <span>Güvenlik Gözlemleri</span>
                     </h4>
                     <ul className="space-y-1.5">
                       {reviewResult.securityObservations.map((sec: string, idx: number) => (
                         <li
                           key={idx}
-                          className="p-2.5 rounded-lg border border-[#a89997] bg-[#b9aba9]/30 text-[#4a3e3b] flex items-start gap-2 font-medium"
+                          className="p-2.5 rounded-lg border border-[#BCC7D2] bg-[#EDF3EE] text-[#3E5164] flex items-start gap-2 font-medium"
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#231c1a] mt-1.5 shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#3E5164] mt-1.5 shrink-0" />
                           <span>{sec}</span>
                         </li>
                       ))}
@@ -599,37 +600,31 @@ export const RepositoriesView: React.FC<Props> = ({
                     gün bazlı bir takvim değildir. */}
                 {reviewResult.recommendedRoadmap && reviewResult.recommendedRoadmap.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="font-bold text-xs text-[#231c1a] uppercase tracking-wider flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-[#231c1a]" aria-hidden="true" />
+                    <h4 className="font-bold text-xs text-[#253341] uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#253341]" aria-hidden="true" />
                       <span>Önceliklendirilmiş Mühendislik Aksiyon Planı</span>
                     </h4>
                     <div className="space-y-2">
                       {reviewResult.recommendedRoadmap.map((item, idx: number) => {
                         const priority = item.priority || 'MEDIUM';
-                        const priorityBadge =
-                          priority === 'HIGH'
-                            ? 'bg-[#231c1a] text-[#f9b88e]'
-                            : priority === 'MEDIUM'
-                              ? 'bg-[#f9b88e] text-[#231c1a]'
-                              : 'bg-[#b9aba9] text-[#231c1a]';
                         return (
                           <div
                             key={idx}
-                            className="p-3 rounded-xl border border-[#a89997] bg-[#b9aba9]/30 space-y-1 text-[#231c1a] shadow-xs"
+                            className="p-3 rounded-xl border border-[#BCC7D2] bg-[#EDF3EE] space-y-1 text-[#253341] shadow-xs"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-bold text-xs flex items-center gap-2">
-                                <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#f9b88e] text-[#231c1a] border border-[#231c1a]/15">
+                                <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-[#F2A488] text-[#253341] border border-[#EC7D55]">
                                   {idx + 1}
                                 </span>
                                 <span>{item.title}</span>
                               </span>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border border-[#231c1a]/15 ${priorityBadge}`}>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getSeverityBadgeClass(priority)}`}>
                                 {priority}
                               </span>
                             </div>
                             {item.description && (
-                              <p className="text-[11px] text-[#4a3e3b] pl-6 font-medium leading-relaxed">
+                              <p className="text-[11px] text-[#3E5164] pl-6 font-medium leading-relaxed">
                                 {item.description}
                               </p>
                             )}
@@ -641,11 +636,11 @@ export const RepositoriesView: React.FC<Props> = ({
                 )}
 
                 {/* Alt Butonlar */}
-                <div className="pt-3 border-t border-[#a89997] flex justify-end gap-2">
+                <div className="pt-3 border-t border-[#BCC7D2] flex justify-end gap-2">
                   <button
                     onClick={() => handleTriggerReview(activeRepoForReview, true)}
                     disabled={isReviewInFlight}
-                    className="px-3 py-2 rounded-lg text-xs font-bold border border-[#231c1a]/15 bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    className="px-3 py-2 rounded-lg text-xs font-bold border border-[#BCC7D2] bg-[#EDF3EE] text-[#253341] hover:bg-[#DBE6DD] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
                     Yeniden Üret
                   </button>
@@ -655,7 +650,7 @@ export const RepositoriesView: React.FC<Props> = ({
                       setActiveRepoForReview(null);
                       setReviewResult(null);
                     }}
-                    className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#f9b88e] text-[#231c1a] hover:brightness-105 transition-all cursor-pointer border border-[#231c1a]/15 shadow-xs"
+                    className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#EC7D55] text-[#253341] hover:bg-[#AB421C] hover:text-[#F5F9F5] transition-colors cursor-pointer border border-[#AB421C] shadow-xs"
                   >
                     Kensai Sor
                   </button>
@@ -664,7 +659,7 @@ export const RepositoriesView: React.FC<Props> = ({
                       setActiveRepoForReview(null);
                       setReviewResult(null);
                     }}
-                    className="px-3 py-2 rounded-lg text-xs font-bold border border-[#a89997] bg-[#b9aba9]/35 text-[#231c1a] hover:bg-[#b9aba9]/50 transition-all cursor-pointer"
+                    className="px-3 py-2 rounded-lg text-xs font-bold border border-[#BCC7D2] bg-[#EDF3EE] text-[#253341] hover:bg-[#DBE6DD] transition-colors cursor-pointer"
                   >
                     Kapat
                   </button>
