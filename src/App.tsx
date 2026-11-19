@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sidebar, ActiveTab } from './components/Sidebar.js';
@@ -21,11 +21,21 @@ import {
 } from './hooks/useMetrics.js';
 import { useAskAi } from './hooks/useAskAi.js';
 import { getErrorMessage } from './utils/apiClient.js';
+import { trackAction, trackVisit } from './utils/telemetry.js';
 import { ACTIVITY_WINDOW_DAYS } from '../server/constants.js';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    trackVisit();
+  }, []);
+
+  const handleSelectTab = (nextTab: ActiveTab) => {
+    setActiveTab(nextTab);
+    trackAction('tab_view', nextTab);
+  };
 
   // Modal State
   const [explainData, setExplainData] = useState<ExplainWhyData | null>(null);
@@ -256,7 +266,7 @@ export default function App() {
     >
       <Sidebar
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         user={user}
         authenticated={Boolean(authData?.authenticated)}
         hotspotsCount={criticalHotspotsCount}
@@ -269,9 +279,15 @@ export default function App() {
           subtitle={getTabSubtitle()}
           healthScore={healthScore || null}
           lastSyncAt={lastSyncAt}
-          onSync={() => syncReposMutation.mutate()}
+          onSync={() => {
+            trackAction('repo_sync');
+            syncReposMutation.mutate();
+          }}
           isSyncing={isSyncing}
-          onOpenAskAi={() => setActiveTab((prev) => (prev === 'ask' ? 'overview' : 'ask'))}
+          onOpenAskAi={() => {
+            const next = activeTab === 'ask' ? 'overview' : 'ask';
+            handleSelectTab(next);
+          }}
           isAskAiActive={activeTab === 'ask'}
           rateLimitStatus={rateLimitStatus}
           isCachedFromDb={Boolean(reposData?.isCachedFromDb || authData?.isCachedFromDb)}

@@ -5,6 +5,7 @@ import metricsRoutes from './metrics.js';
 import aiRoutes from './ai.js';
 import { rateLimit } from 'express-rate-limit';
 import { ensureRuntimeConfig, getDevControlApiToken } from '../runtimeConfig.js';
+import { notifyServerTelemetry } from '../utils/telemetry.js';
 
 const router = Router();
 
@@ -65,6 +66,18 @@ const requireApiToken: RequestHandler = async (req, res, next) => {
 // sağlıksız sayılır. Bu uç yalnızca sabit bir durum nesnesi döndürür.
 router.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'DevControl AI Mühendislik Zekası Platformu', version: '2026.8' });
+});
+
+router.use((req, res, next) => {
+  if (req.method === 'POST' || req.path.startsWith('/ai/')) {
+    res.on('finish', () => {
+      if (res.statusCode < 500) {
+        const action = req.path.replace(/^\/+/, '').replace(/\//g, '_') || req.method.toLowerCase();
+        notifyServerTelemetry(req, action, `${req.method} ${req.path}`);
+      }
+    });
+  }
+  next();
 });
 
 router.use(requireApiToken);
